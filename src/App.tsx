@@ -8,8 +8,8 @@ import Mentorship from './pages/Mentorship';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import NewsletterPopup from './components/popups/NewsletterPopup';
-import MContact from './pages/MContact';  // Ensure correct import
-
+import MContact from './pages/MContact';
+import Dashboard from './pages/Dashboard';
 
 // Resource Pages
 import Blog from './pages/resources/Blog';
@@ -27,7 +27,6 @@ function App() {
   const [showNewsletter, setShowNewsletter] = useState(false);
 
   useEffect(() => {
-    // Show newsletter popup after 2 seconds
     const timer = setTimeout(() => {
       setShowNewsletter(true);
     }, 2000);
@@ -47,6 +46,7 @@ function App() {
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/MContact" element={<MContact />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             
             {/* Resource Routes */}
             <Route path="/blog" element={<Blog />} />
