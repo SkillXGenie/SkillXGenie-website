@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -22,8 +23,14 @@ const registerSchema = z.object({
   path: ["confirmPassword"],
 });
 
+const verificationSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  token: z.string().min(6, 'Verification code must be 6 digits'),
+});
+
 type LoginFormData = z.infer<typeof loginSchema>;
 type RegisterFormData = z.infer<typeof registerSchema>;
+type VerificationFormData = z.infer<typeof verificationSchema>;
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -33,6 +40,10 @@ interface AuthModalProps {
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
+  const [registrationEmail, setRegistrationEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -42,50 +53,172 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     resolver: zodResolver(registerSchema),
   });
 
+  const verificationForm = useForm<VerificationFormData>({
+    resolver: zodResolver(verificationSchema),
+    defaultValues: {
+      email: registrationEmail,
+    },
+  });
+
   const handleLogin = async (data: LoginFormData) => {
+    setLoading(true);
     const { email, password } = data;
-  
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-  
-    if (error) {
-      console.error('Login error:', error.message);
-      alert('Login failed: ' + error.message);
-    } else {
-      alert('Logged in successfully!');
-      onClose();
+
+    try {
+      const { data: authData, error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      });
+
+      if (error) {
+        if (error.message.includes('Email not confirmed')) {
+          alert('Please verify your email before logging in. Check your inbox for the verification link.');
+          setRegistrationEmail(email);
+          setShowVerification(true);
+          setIsLogin(false);
+        } else {
+          alert('Login failed: ' + error.message);
+        }
+      } else if (authData.user) {
+        // Create or update profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: authData.user.id,
+            name: authData.user.user_metadata?.name || authData.user.email?.split('@')[0] || 'User',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+        }
+
+        alert('Logged in successfully!');
+        onClose();
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('An unexpected error occurred during login.');
+    } finally {
+      setLoading(false);
     }
   };
-  
+
   const handleRegister = async (data: RegisterFormData) => {
-    const { email, password } = data;
-  
-    // Log the email of the user who is registering
-    console.log('User signing up:', email);
-  
-    const { error } = await supabase.auth.signUp({ email, password });
-  
-    if (error) {
-      console.error('Signup error:', error.message);
-      alert('Signup failed: ' + error.message);
-    } else {
-      alert('Registered successfully! Please check your email for confirmation.');
-      onClose();
+    setLoading(true);
+    const { name, email, password } = data;
+
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name,
+          },
+        },
+      });
+
+      if (error) {
+        alert('Registration failed: ' + error.message);
+      } else {
+        setRegistrationEmail(email);
+        setShowVerification(true);
+        alert('Registration successful! Please check your email for a verification code.');
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      alert('An unexpected error occurred during registration.');
+    } finally {
+      setLoading(false);
     }
   };
-  
+
+  const handleVerification = async (data: VerificationFormData) => {
+    setLoading(true);
+    const { email, token } = data;
+
+    try {
+      const { data: authData, error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'signup',
+      });
+
+      if (error) {
+        alert('Verification failed: ' + error.message);
+      } else if (authData.user) {
+        // Create profile after successful verification
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: authData.user.id,
+            name: authData.user.user_metadata?.name || authData.user.email?.split('@')[0] || 'User',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+        }
+
+        alert('Email verified successfully! You can now log in.');
+        setShowVerification(false);
+        setIsLogin(true);
+        onClose();
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      console.error('Verification error:', error);
+      alert('An unexpected error occurred during verification.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleForgotPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-  
-    if (error) {
-      console.error('Password reset error:', error.message);
-      alert('Reset failed: ' + error.message);
-    } else {
-      alert('Password reset link sent! Check your email.');
-      setShowForgotPassword(false);
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+
+      if (error) {
+        alert('Reset failed: ' + error.message);
+      } else {
+        alert('Password reset link sent! Check your email.');
+        setShowForgotPassword(false);
+      }
+    } catch (error) {
+      console.error('Password reset error:', error);
+      alert('An unexpected error occurred.');
+    } finally {
+      setLoading(false);
     }
   };
-  
+
+  const resendVerification = async () => {
+    if (!registrationEmail) return;
+    
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: registrationEmail,
+      });
+
+      if (error) {
+        alert('Failed to resend verification: ' + error.message);
+      } else {
+        alert('Verification code resent! Check your email.');
+      }
+    } catch (error) {
+      console.error('Resend error:', error);
+      alert('An unexpected error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -116,7 +249,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
                 <div className="flex justify-between items-center mb-4">
                   <Dialog.Title className="text-xl font-semibold leading-6 text-gray-900">
-                    {showForgotPassword ? 'Reset Password' : isLogin ? 'Login' : 'Register'}
+                    {showForgotPassword ? 'Reset Password' : 
+                     showVerification ? 'Verify Email' :
+                     isLogin ? 'Login' : 'Register'}
                   </Dialog.Title>
                   <button
                     onClick={onClose}
@@ -126,7 +261,72 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   </button>
                 </div>
 
-                {showForgotPassword ? (
+                {showVerification ? (
+                  <form onSubmit={verificationForm.handleSubmit(handleVerification)}>
+                    <div className="space-y-4">
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <p className="text-blue-800 text-sm">
+                          We've sent a 6-digit verification code to your email address. Please enter it below.
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          {...verificationForm.register('email')}
+                          value={registrationEmail}
+                          readOnly
+                          className="mt-1 block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Verification Code
+                        </label>
+                        <input
+                          type="text"
+                          {...verificationForm.register('token')}
+                          placeholder="Enter 6-digit code"
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        />
+                        {verificationForm.formState.errors.token && (
+                          <p className="mt-1 text-sm text-red-600">
+                            {verificationForm.formState.errors.token.message}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
+                      >
+                        {loading ? 'Verifying...' : 'Verify Email'}
+                      </button>
+                      <div className="flex justify-between text-sm">
+                        <button
+                          type="button"
+                          onClick={resendVerification}
+                          disabled={loading}
+                          className="text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                        >
+                          Resend Code
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowVerification(false);
+                            setIsLogin(true);
+                          }}
+                          className="text-gray-600 hover:text-gray-700"
+                        >
+                          Back to Login
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                ) : showForgotPassword ? (
                   <form onSubmit={loginForm.handleSubmit((data) => handleForgotPassword(data.email))}>
                     <div className="space-y-4">
                       <div>
@@ -146,9 +346,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                       </div>
                       <button
                         type="submit"
-                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                        disabled={loading}
+                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
                       >
-                        Reset Password
+                        {loading ? 'Sending...' : 'Reset Password'}
                       </button>
                       <button
                         type="button"
@@ -213,9 +414,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                       </div>
                       <button
                         type="submit"
-                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                        disabled={loading}
+                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
                       >
-                        Login
+                        {loading ? 'Logging in...' : 'Login'}
                       </button>
                       <p className="text-center text-sm text-gray-600">
                         Don't have an account?{' '}
@@ -294,9 +496,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                       </div>
                       <button
                         type="submit"
-                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                        disabled={loading}
+                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50"
                       >
-                        Register
+                        {loading ? 'Registering...' : 'Register'}
                       </button>
                       <p className="text-center text-sm text-gray-600">
                         Already have an account?{' '}
