@@ -1,12 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-
-// Replace with your actual project values
-const supabaseUrl = 'https://jtdokisjwkgcohtobgxz.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0ZG9raXNqd2tnY29odG9iZ3h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1MDIzMTAsImV4cCI6MjA2MTA3ODMxMH0.-zvpzytR8gIYcnUgjZ9mFDKSrvrC3Kax1tjW6E1zznE';
-
-const supabase = createClient(supabaseUrl, supabaseKey);
-
 import React, { Fragment, useState } from 'react';
+import { supabase } from '../lib/supabaseClient';
 import { Dialog, Transition } from '@headlessui/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
