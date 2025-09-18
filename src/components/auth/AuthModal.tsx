@@ -1,5 +1,5 @@
 import React, { Fragment, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../../lib/supabaseClient';
 import { Dialog, Transition } from '@headlessui/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
