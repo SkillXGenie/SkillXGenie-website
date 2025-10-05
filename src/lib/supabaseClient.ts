@@ -9,8 +9,8 @@ const createMockClient = () => {
     auth: {
       getUser: () => Promise.resolve({ data: { user: null }, error: null }),
       getSession: () => Promise.resolve({ data: { session: null }, error: null }),
-      signUp: () => Promise.resolve({ data: { user: null, session: null }, error: { message: 'Authentication not configured' } }),
-      signInWithPassword: () => Promise.resolve({ data: { user: null, session: null }, error: { message: 'Authentication not configured' } }),
+      signUp: () => Promise.resolve({ data: { user: null, session: null }, error: { message: 'Authentication not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.' } }),
+      signInWithPassword: () => Promise.resolve({ data: { user: null, session: null }, error: { message: 'Authentication not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.' } }),
       signOut: () => Promise.resolve({ error: null }),
       onAuthStateChange: (callback: any) => {
         // Call callback immediately with no user
@@ -23,16 +23,16 @@ const createMockClient = () => {
           } 
         };
       },
-      resetPasswordForEmail: () => Promise.resolve({ error: { message: 'Authentication not configured' } }),
-      verifyOtp: () => Promise.resolve({ error: { message: 'Authentication not configured' } }),
-      resend: () => Promise.resolve({ error: { message: 'Authentication not configured' } })
+      resetPasswordForEmail: () => Promise.resolve({ error: { message: 'Authentication not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.' } }),
+      verifyOtp: () => Promise.resolve({ error: { message: 'Authentication not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.' } }),
+      resend: () => Promise.resolve({ error: { message: 'Authentication not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.' } })
     },
     from: (table: string) => ({
       select: () => Promise.resolve({ data: [], error: null }),
-      insert: () => Promise.resolve({ data: null, error: { message: 'Database not configured' } }),
-      update: () => Promise.resolve({ data: null, error: { message: 'Database not configured' } }),
-      delete: () => Promise.resolve({ data: null, error: { message: 'Database not configured' } }),
-      single: () => Promise.resolve({ data: null, error: { message: 'Database not configured' } }),
+      insert: () => Promise.resolve({ data: null, error: { message: 'Database not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.' } }),
+      update: () => Promise.resolve({ data: null, error: { message: 'Database not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.' } }),
+      delete: () => Promise.resolve({ data: null, error: { message: 'Database not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.' } }),
+      single: () => Promise.resolve({ data: null, error: { message: 'Database not configured. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file.' } }),
       eq: function(column: string, value: any) { return this; },
       neq: function(column: string, value: any) { return this; },
       gt: function(column: string, value: any) { return this; },
@@ -63,12 +63,15 @@ const createMockClient = () => {
   };
 };
 
+// Declare the supabase variable at module level
+let supabase: any;
+
 // Check if environment variables are present and valid
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase environment variables not configured. Using mock client.');
   console.warn('To enable authentication and database features, add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file');
   
-  export const supabase = createMockClient() as any;
+  supabase = createMockClient();
 } else {
   try {
     // Validate URL format
@@ -77,7 +80,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.log('Supabase configured successfully');
     
     // Create real Supabase client
-    export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    supabase = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
@@ -87,6 +90,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
     });
   } catch (error) {
     console.warn(`Invalid Supabase URL format: ${supabaseUrl}. Using mock client.`);
-    export const supabase = createMockClient() as any;
+    supabase = createMockClient();
   }
 }
+
+// Export the supabase client
+export { supabase };
