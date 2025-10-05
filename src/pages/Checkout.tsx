@@ -77,6 +77,32 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
   const { subtotal, gst, total } = calculatePricing();
 
+  const generateOrderNumber = () => {
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    return `ORD-${date}-${random}`;
+  };
+
+  const saveOrderToDatabase = async (orderData: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .insert([orderData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error saving order:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Database error:', error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -94,6 +120,30 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     }
 
     try {
+      // First, save order to database
+      const orderNumber = generateOrderNumber();
+      const orderData = {
+        user_id: user.id,
+        order_number: orderNumber,
+        customer_name: billingDetails.name,
+        customer_email: billingDetails.email,
+        customer_phone: billingDetails.phone,
+        billing_address: billingDetails.address,
+        items: cartItems.map(item => ({
+          courseId: item.courseId,
+          plan: item.plan,
+          price: item.price,
+          courseName: courses.find(c => c.id === item.courseId)?.title || 'Unknown Course'
+        })),
+        subtotal: subtotal * 100, // Convert to paise
+        gst_amount: gst * 100, // Convert to paise
+        total_amount: total * 100, // Convert to paise
+        payment_status: 'pending'
+      };
+
+      const savedOrder = await saveOrderToDatabase(orderData);
+      console.log('Order saved:', savedOrder);
+
       // Create payment method
       const { error: paymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
         type: 'card',
@@ -112,10 +162,25 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       // 1. Send payment details to your backend
       // 2. Create a payment intent on your server
       // 3. Confirm the payment
+      // 4. Update order status to 'completed'
       
       // For demo purposes, we'll simulate a successful payment
       setTimeout(() => {
-        alert('Payment successful! (Demo mode)');
+        // Update order status to completed
+        try {
+          await supabase
+            .from('orders')
+            .update({ 
+              payment_status: 'completed',
+              payment_intent_id: 'demo_payment_' + Date.now()
+            })
+            .eq('id', savedOrder.id);
+          
+          alert(`Payment successful! Order #${orderNumber} (Demo mode)`);
+        } catch (error) {
+          console.error('Error updating order status:', error);
+          alert('Payment successful but failed to update order status');
+        }
         
         // Clear cart
         localStorage.removeItem('courseCart');
@@ -128,6 +193,18 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
     } catch (error) {
       console.error('Payment error:', error);
+      
+      // Update order status to failed if order was created
+      try {
+        const orderNumber = generateOrderNumber();
+        await supabase
+          .from('orders')
+          .update({ payment_status: 'failed' })
+          .eq('order_number', orderNumber);
+      } catch (dbError) {
+        console.error('Error updating failed order status:', dbError);
+      }
+      
       alert('Payment failed. Please try again.');
       setProcessing(false);
     }
