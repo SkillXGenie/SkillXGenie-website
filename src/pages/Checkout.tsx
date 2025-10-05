@@ -173,14 +173,21 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       console.log('Calling Supabase Edge Function...');
       console.log('Edge Function URL:', `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-cashfree-order`);
       
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-cashfree-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
         },
-        body: JSON.stringify(orderData)
+        body: JSON.stringify(orderData),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       console.log('Edge Function Response Status:', response.status);
       console.log('Edge Function Response Headers:', Object.fromEntries(response.headers.entries()));
@@ -203,6 +210,9 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       return result.data;
 
     } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Request timeout - please check your internet connection and try again');
+      }
       console.error('Error creating Cashfree order:', error);
       throw error;
     }
@@ -316,14 +326,19 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         throw new Error('Cashfree SDK not loaded. Please refresh the page and try again.');
       }
       
+      console.log('Initializing Cashfree SDK...');
       const cashfree = window.Cashfree({ mode: "production" });
       
       console.log('Opening Cashfree payment popup with order token:', cashfreeOrder.order_token);
+      
+      // Add a small delay to ensure everything is ready
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       cashfree.pay({
         orderToken: cashfreeOrder.order_token,
         onSuccess: (data: any) => {
           console.log("Payment Success:", data);
+          setProcessing(false);
           window.location.href = `${window.location.origin}/payment-success?order_id=${cashfreeOrder.order_id}&status=success`;
         },
         onFailure: (data: any) => {
@@ -339,7 +354,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
     } catch (error) {
       console.error('Payment error:', error);
-      alert(`Payment failed: ${error.message}. Please try again.`);
+      alert(`Payment failed: ${error.message || 'Unknown error occurred'}. Please try again.`);
       setProcessing(false);
     }
   };

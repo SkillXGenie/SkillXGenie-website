@@ -74,6 +74,11 @@ serve(async (req: Request) => {
 
     // Make request to Cashfree
     console.log('Making request to Cashfree API...');
+    
+    // Add timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+    
     const response = await fetch(cashfreeUrl, {
       method: "POST",
       headers: {
@@ -82,8 +87,11 @@ serve(async (req: Request) => {
         "x-client-secret": CASHFREE_SECRET_KEY,
         "x-api-version": "2022-09-01"
       },
-      body: JSON.stringify(orderPayload)
+      body: JSON.stringify(orderPayload),
+      signal: controller.signal
     })
+    
+    clearTimeout(timeoutId);
 
     console.log('Cashfree API response status:', response.status);
     const responseText = await response.text()
@@ -135,6 +143,23 @@ serve(async (req: Request) => {
     )
 
   } catch (error) {
+    if (error.name === 'AbortError') {
+      console.error("Cashfree API request timeout");
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Request timeout - Cashfree API is not responding"
+        }),
+        {
+          status: 408,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      )
+    }
+    
     console.error("Error creating Cashfree order:", error)
     
     return new Response(
