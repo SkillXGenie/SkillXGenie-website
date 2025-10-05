@@ -162,7 +162,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
                         cashfreeOrderData.payment_session_id || 
                         cashfreeOrderData.checkout_url ||
                         cashfreeOrderData.payment_url;
-      
+      const paymentSessionId = cashfreeOrderData.payment_session_id || cashfreeOrderData.order_token;
       if (paymentUrl) {
         console.log('Redirecting to payment URL:', paymentUrl);
         
@@ -171,13 +171,15 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
           const checkoutUrl = `https://sandbox.cashfree.com/pg/web/checkout?order_token=${cashfreeOrderData.payment_session_id}`;
           console.log('Constructed checkout URL:', checkoutUrl);
           window.open(checkoutUrl, '_self');
-        } else {
-          // Direct redirect for full URLs
+      } else if (paymentSessionId && typeof paymentSessionId === 'string') {
+        // Clean the session ID to remove any extra text
+        const cleanSessionId = paymentSessionId.split('payment')[0];
+        const checkoutUrl = `https://sandbox.cashfree.com/pg/web/checkout?order_token=${cleanSessionId}`;
           window.open(paymentUrl, '_self');
         }
       } else {
         console.error('Available fields in Cashfree response:', Object.keys(cashfreeOrderData));
-        throw new Error(`No payment URL found. Available fields: ${Object.keys(cashfreeOrderData).join(', ')}`);
+        throw new Error(`No valid payment URL or session ID found. Available fields: ${Object.keys(cashfreeOrderData).join(', ')}`);
       }
       
     } catch (error) {
