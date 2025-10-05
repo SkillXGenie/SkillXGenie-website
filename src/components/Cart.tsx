@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingCart, Trash2, IndianRupee } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 import AuthModal from './auth/AuthModal';
+import { useNavigate } from 'react-router-dom';
 
 interface CartItem {
   courseId: string;
@@ -57,6 +58,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [user, setUser] = useState<any>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     getUser();
@@ -117,9 +119,9 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
       return;
     }
 
-    // Proceed with checkout
-    alert(`Proceeding to checkout with ${cartItems.length} items. Total: ₹${getTotalPrice().toLocaleString()}`);
-    // Here you would integrate with your payment processor
+    // Navigate to checkout page
+    navigate('/checkout');
+    onClose();
   };
 
   return (

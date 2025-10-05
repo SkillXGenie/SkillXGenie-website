@@ -607,10 +607,9 @@ const CourseDetail = () => {
       return;
     }
 
-    // User is logged in, proceed with purchase
-    const priceString = plan === 'short' ? course!.shortTermPrice : course!.longTermPrice;
-    alert(`Proceeding to checkout for ${course!.title} - ${plan === 'short' ? 'Short-Term' : 'Long-Term'} plan (${priceString})`);
-    // Here you would integrate with your payment processor
+    // User is logged in, add to cart and go to checkout
+    addToCart(plan);
+    navigate('/checkout');
   };
 
   const toggleModule = (moduleTitle: string) => {
