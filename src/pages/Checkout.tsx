@@ -282,12 +282,23 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       localStorage.removeItem('courseCart');
 
       // Redirect to Cashfree payment page
-      const paymentUrl = cashfreeOrder.payment_session_id 
-        ? `https://payments.cashfree.com/pay/${cashfreeOrder.payment_session_id}`
-        : cashfreeOrder.payment_link;
+      let paymentUrl;
+      
+      if (cashfreeOrder.payment_session_id) {
+        // Use the correct Cashfree checkout URL format
+        paymentUrl = `https://payments.cashfree.com/pay/${cashfreeOrder.payment_session_id}`;
+      } else if (cashfreeOrder.payment_link) {
+        paymentUrl = cashfreeOrder.payment_link;
+      } else {
+        throw new Error('No payment URL received from Cashfree');
+      }
       
       console.log('Redirecting to payment URL:', paymentUrl);
-      window.location.href = paymentUrl;
+      
+      // Add a small delay to ensure the order is saved before redirect
+      setTimeout(() => {
+        window.location.href = paymentUrl;
+      }, 1000);
 
     } catch (error) {
       console.error('Payment error:', error);
@@ -428,7 +439,17 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
         <div className="bg-blue-50 p-4 rounded-lg">
           <p className="text-sm text-blue-800">
-            <strong>Secure Payment:</strong> You will be redirected to Cashfree's secure payment gateway where you can choose your preferred payment method and complete the transaction safely.
+            <strong>How Payment Works:</strong>
+          </p>
+          <ol className="text-sm text-blue-800 mt-2 space-y-1">
+            <li>1. Click "Proceed to Payment" below</li>
+            <li>2. You'll be redirected to Cashfree's secure payment page</li>
+            <li>3. Choose your payment method (Card/UPI/NetBanking/Wallet)</li>
+            <li>4. Complete the payment securely</li>
+            <li>5. You'll be redirected back to our success page</li>
+          </ol>
+          <p className="text-sm text-blue-800 mt-2">
+            <strong>Note:</strong> All payment details are entered on Cashfree's secure platform, not on our site.
           </p>
         </div>
       </div>

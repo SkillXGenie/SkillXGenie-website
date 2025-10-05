@@ -70,7 +70,10 @@ serve(async (req: Request) => {
       order_amount,
       order_currency,
       customer_details,
-      order_meta
+      order_meta,
+      order_tags: {
+        source: "skillxgenie_website"
+      }
     }
 
     console.log('Order payload:', { ...orderPayload, customer_details: { ...customer_details, customer_phone: customer_details.customer_phone ? 'PROVIDED' : 'MISSING' } });
@@ -98,11 +101,20 @@ serve(async (req: Request) => {
       throw new Error(errorMsg)
     }
 
+    // Ensure we have the required payment session ID
+    if (!cashfreeResponse.payment_session_id) {
+      console.error('No payment_session_id in response:', cashfreeResponse);
+      throw new Error('Invalid response from Cashfree - missing payment session ID');
+    }
+
     console.log('Order created successfully');
     return new Response(
       JSON.stringify({
         success: true,
-        data: cashfreeResponse
+        data: {
+          ...cashfreeResponse,
+          payment_url: `https://payments.cashfree.com/pay/${cashfreeResponse.payment_session_id}`
+        }
       }),
       {
         headers: {
