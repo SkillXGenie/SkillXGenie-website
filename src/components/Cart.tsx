@@ -87,14 +87,20 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
   const getUser = async () => {
     try {
       const { data: { user }, error } = await supabase.auth.getUser();
-      if (error && error.message !== 'Authentication not configured') {
-        console.error('Error getting user:', error);
+      if (error) {
+        // Only log errors that aren't configuration-related
+        if (error.message !== 'Authentication not configured' && 
+            !error.message.includes('not configured') &&
+            !error.message.includes('Failed to fetch')) {
+          console.error('Error getting user:', error);
+        }
         setUser(null);
       } else {
         setUser(user);
       }
     } catch (error) {
-      // Silently handle errors when Supabase is not configured
+      // Silently handle network errors and configuration issues
+      console.warn('Unable to connect to authentication service');
       setUser(null);
     }
   };
