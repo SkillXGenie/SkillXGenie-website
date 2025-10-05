@@ -67,10 +67,7 @@ serve(async (req: Request) => {
       order_amount,
       order_currency,
       customer_details,
-      order_meta,
-      order_tags: {
-        source: "skillxgenie_website"
-      }
+      order_meta
     }
 
     console.log('Order payload:', { ...orderPayload, customer_details: { ...customer_details, customer_phone: customer_details.customer_phone ? 'PROVIDED' : 'MISSING' } });
@@ -83,13 +80,23 @@ serve(async (req: Request) => {
         "Content-Type": "application/json",
         "x-client-id": CASHFREE_APP_ID,
         "x-client-secret": CASHFREE_SECRET_KEY,
-        "x-api-version": "2023-08-01"
+        "x-api-version": "2022-09-01"
       },
       body: JSON.stringify(orderPayload)
     })
 
     console.log('Cashfree API response status:', response.status);
-    const cashfreeResponse = await response.json()
+    const responseText = await response.text()
+    console.log('Cashfree API raw response:', responseText);
+    
+    let cashfreeResponse;
+    try {
+      cashfreeResponse = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse Cashfree response:', parseError);
+      throw new Error(`Invalid response from Cashfree API: ${responseText}`);
+    }
+    
     console.log('Cashfree API response:', cashfreeResponse);
 
     if (!response.ok) {
@@ -98,11 +105,14 @@ serve(async (req: Request) => {
       throw new Error(errorMsg)
     }
 
-    // Validate that we received an order_token
-    if (!cashfreeResponse.order_token) {
+    // Check for different possible response formats
+    const orderToken = cashfreeResponse.order_token || cashfreeResponse.payment_session_id;
+    const orderId = cashfreeResponse.order_id || cashfreeResponse.cf_order_id;
+    
+    if (!orderToken) {
       console.error('No order_token received from Cashfree API');
       console.error('Response:', cashfreeResponse);
-      throw new Error('No order_token received from Cashfree API');
+      throw new Error(`No order_token received from Cashfree API. Response: ${JSON.stringify(cashfreeResponse)}`);
     }
 
     console.log('Order created successfully');
@@ -110,8 +120,8 @@ serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         data: {
-          order_id: cashfreeResponse.order_id,
-          order_token: cashfreeResponse.order_token,
+          order_id: orderId,
+          order_token: orderToken,
           payment_session_id: cashfreeResponse.payment_session_id
         },
         order_expiry_time: new Date(Date.now() + 30 * 60 * 1000).toISOString()
