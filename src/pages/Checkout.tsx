@@ -184,18 +184,33 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       const checkoutOptions = {
         paymentSessionId: cashfreeOrderData.payment_session_id,
         returnUrl: `${window.location.origin}/payment-success?order_id=${cashfreeOrderData.order_id}`,
-        redirectTarget: '_self' // Redirect in same window
       };
 
       console.log('Checkout options:', checkoutOptions);
 
-      // Use redirect method for better compatibility
-      const result = await cashfree.redirect(checkoutOptions);
+      // Try checkout method first, with fallback to manual redirect
+      try {
+        console.log('Attempting Cashfree checkout...');
+        const result = await cashfree.checkout(checkoutOptions);
+        console.log('Cashfree checkout result:', result);
+      } catch (checkoutError) {
+        console.error('Cashfree checkout failed, trying manual redirect:', checkoutError);
+        
+        // Fallback: redirect to Cashfree payment page manually
+        if (cashfreeOrderData.payment_link) {
+          console.log('Redirecting to payment link:', cashfreeOrderData.payment_link);
+          window.location.href = cashfreeOrderData.payment_link;
+        } else {
+          throw new Error('No payment link available for redirect');
+        }
+      }
       
-      console.log('Cashfree redirect result:', result);
-
     } catch (error) {
-      console.error('Payment initiation error:', error);
+      console.error('Payment initiation error details:', {
+        message: error.message,
+        stack: error.stack,
+        cashfreeData: cashfreeOrderData
+      });
       throw error;
     }
   };
