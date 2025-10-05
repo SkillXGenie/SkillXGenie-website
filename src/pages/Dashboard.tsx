@@ -2,18 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import {
-  User,
-  Award,
-  Settings,
-  LogOut,
-  ChevronLeft,
-  Upload,
-  Edit2,
-  BookOpen,
-  Star,
-  Trophy
-} from 'lucide-react';
+import { User, Award, Settings, LogOut, ChevronLeft, Upload, CreditCard as Edit2, BookOpen, Star, Trophy } from 'lucide-react';
 
 interface Profile {
   id: string;
