@@ -769,15 +769,7 @@ const CourseDetail = () => {
               </div>
             </div>
 
-            {/* Course Content */}
-            <div className="bg-white rounded-xl p-6 shadow-lg">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold">Course content</h2>
-                <button className="text-purple-600 hover:text-purple-700 font-medium">
-                  onClick={expandAllSections}
-                  {allExpanded ? 'Collapse all sections' : 'Expand all sections'}
-                </button>
-              </div>
+              <h2 className="text-2xl font-bold mb-6">Course content</h2>
               
               <div className="mb-4 text-sm text-gray-600">
                 {content.shortTerm.totalModules} sections • {content.shortTerm.totalLectures} lectures • {content.shortTerm.totalDuration} total length
