@@ -297,16 +297,25 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         paymentUrl = `https://payments.cashfree.com/pay/${cashfreeOrder.payment_session_id}`;
       } else if (cashfreeOrder.payment_link) {
         paymentUrl = cashfreeOrder.payment_link;
+      } else if (cashfreeOrder.checkout_url) {
+        paymentUrl = cashfreeOrder.checkout_url;
       } else {
+        console.error('Cashfree response:', cashfreeOrder);
         throw new Error('No payment URL received from Cashfree');
       }
       
       console.log('Redirecting to payment URL:', paymentUrl);
       
-      // Add a small delay to ensure the order is saved before redirect
-      setTimeout(() => {
-        window.location.href = paymentUrl;
-      }, 1000);
+      // Test the URL first
+      try {
+        const testResponse = await fetch(paymentUrl, { method: 'HEAD', mode: 'no-cors' });
+        console.log('Payment URL test successful');
+      } catch (testError) {
+        console.warn('Payment URL test failed, but proceeding anyway:', testError);
+      }
+      
+      // Redirect immediately
+      window.location.href = paymentUrl;
 
     } catch (error) {
       console.error('Payment error:', error);

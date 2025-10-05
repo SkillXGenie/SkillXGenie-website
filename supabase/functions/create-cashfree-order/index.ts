@@ -104,7 +104,12 @@ serve(async (req: Request) => {
     // Ensure we have the required payment session ID
     if (!cashfreeResponse.payment_session_id) {
       console.error('No payment_session_id in response:', cashfreeResponse);
-      throw new Error('Invalid response from Cashfree - missing payment session ID');
+      console.log('Full Cashfree response structure:', JSON.stringify(cashfreeResponse, null, 2));
+      
+      // Check for alternative response formats
+      if (!cashfreeResponse.checkout_url && !cashfreeResponse.payment_link) {
+        throw new Error('Invalid response from Cashfree - missing payment session ID, checkout_url, or payment_link');
+      }
     }
 
     console.log('Order created successfully');
@@ -113,7 +118,9 @@ serve(async (req: Request) => {
         success: true,
         data: {
           ...cashfreeResponse,
-          payment_url: `https://payments.cashfree.com/pay/${cashfreeResponse.payment_session_id}`
+          payment_url: cashfreeResponse.payment_session_id 
+            ? `https://payments.cashfree.com/pay/${cashfreeResponse.payment_session_id}`
+            : (cashfreeResponse.checkout_url || cashfreeResponse.payment_link)
         }
       }),
       {
