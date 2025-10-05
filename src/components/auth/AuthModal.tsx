@@ -91,20 +91,29 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   const handleRegister = async (data: RegisterFormData) => {
     setLoading(true);
-    const { name, email, password } = data;
+    const { email, password } = data;
 
     try {
+      // Simple registration without any metadata or database calls
       const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`
+        }
       });
 
       if (error) {
-        console.error('Registration error:', error);
-        alert('Registration failed: ' + error.message);
+        console.error('Registration error:', error.message);
+        if (error.message.includes('User already registered')) {
+          alert('This email is already registered. Please try logging in instead.');
+        } else {
+          alert('Registration failed: ' + error.message);
+        }
       } else {
-        alert('Registration successful! Please check your email for a verification link.');
+        alert('Registration successful! Please check your email to verify your account before logging in.');
         setIsLogin(true);
+        registerForm.reset();
       }
     } catch (error) {
       console.error('Registration error:', error);
