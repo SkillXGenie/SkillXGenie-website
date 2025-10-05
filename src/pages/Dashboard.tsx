@@ -67,30 +67,14 @@ const Dashboard = () => {
       if (data && !error) {
         setProfile(data);
         setAvatarUrl(data.avatar_url);
+      } else if (error && error.code === 'PGRST116') {
+        // Profile doesn't exist, it should be created by the trigger
+        // Wait a moment and try again
+        setTimeout(() => {
+          getProfile();
+        }, 1000);
       } else {
-        // Create profile if it doesn't exist
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-
-        if (!insertError) {
-          // Fetch the newly created profile
-          const { data: newProfile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-          
-          if (newProfile) {
-            setProfile(newProfile);
-            setAvatarUrl(newProfile.avatar_url);
-          }
-        }
+        console.error('Error fetching profile:', error);
       }
     }
   };

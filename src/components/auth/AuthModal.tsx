@@ -105,7 +105,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       });
 
       if (error) {
-        alert('Registration failed: ' + error.message);
+        console.error('Registration error:', error);
+        if (error.message.includes('Database error')) {
+          alert('Registration failed: Please try again. If the problem persists, contact support.');
+        } else {
+          alert('Registration failed: ' + error.message);
+        }
       } else {
         alert('Registration successful! Please check your email for a verification link.');
         setIsLogin(true);

@@ -65,30 +65,8 @@ const Navbar = () => {
         .eq('id', user.id)
         .single();
       
-      if (profile && !profile.error) {
+      if (profile) {
         setProfile(profile);
-      } else {
-        // Create profile if it doesn't exist
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-
-        if (!insertError) {
-          const { data: newProfile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-          
-          if (newProfile) {
-            setProfile(newProfile);
-          }
-        }
       }
     }
   };
