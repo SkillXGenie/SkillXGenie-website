@@ -292,12 +292,20 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       // Redirect to Cashfree payment page
       let paymentUrl;
       
-      // Only use the payment URL provided by our Edge Function
-      if (cashfreeOrder.payment_url) {
+      if (cashfreeOrder.payment_url && cashfreeOrder.payment_url !== 'null') {
         paymentUrl = cashfreeOrder.payment_url;
+        console.log('Using payment URL from Edge Function:', paymentUrl);
       } else {
-        console.error('Cashfree response:', cashfreeOrder);
-        throw new Error('No valid payment URL received from payment service');
+        console.error('No valid payment URL in response:', cashfreeOrder);
+        console.error('Available fields:', Object.keys(cashfreeOrder));
+        
+        // Try to construct URL from available data
+        if (cashfreeOrder.payment_session_id) {
+          paymentUrl = `https://payments.cashfree.com/pay/${cashfreeOrder.payment_session_id}`;
+          console.log('Constructed fallback URL:', paymentUrl);
+        } else {
+          throw new Error('No valid payment URL received from payment service. Please contact support.');
+        }
       }
       
       console.log('Redirecting to payment URL:', paymentUrl);
@@ -686,3 +694,5 @@ const Checkout = () => {
 };
 
 export default Checkout;
+
+export default Checkout

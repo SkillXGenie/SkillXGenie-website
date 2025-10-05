@@ -101,15 +101,32 @@ serve(async (req: Request) => {
       throw new Error(errorMsg)
     }
 
-    // Ensure we have the required payment session ID
-    if (!cashfreeResponse.payment_session_id) {
-      console.error('No payment_session_id in response:', cashfreeResponse);
-      console.log('Full Cashfree response structure:', JSON.stringify(cashfreeResponse, null, 2));
-      
-      // Check for alternative response formats
-      if (!cashfreeResponse.checkout_url && !cashfreeResponse.payment_link) {
-        throw new Error('Invalid response from Cashfree - missing payment session ID, checkout_url, or payment_link');
-      }
+    // Log the full response structure for debugging
+    console.log('Full Cashfree response structure:', JSON.stringify(cashfreeResponse, null, 2));
+
+    // Extract payment URL from various possible fields
+    let paymentUrl = null;
+    
+    if (cashfreeResponse.payment_link) {
+      paymentUrl = cashfreeResponse.payment_link;
+      console.log('Using payment_link:', paymentUrl);
+    } else if (cashfreeResponse.checkout_url) {
+      paymentUrl = cashfreeResponse.checkout_url;
+      console.log('Using checkout_url:', paymentUrl);
+    } else if (cashfreeResponse.payment_session_id) {
+      // Construct URL using session ID
+      paymentUrl = `https://payments.cashfree.com/pay/${cashfreeResponse.payment_session_id}`;
+      console.log('Constructed URL from session ID:', paymentUrl);
+    } else if (cashfreeResponse.order_token) {
+      // Alternative construction using order token
+      paymentUrl = `https://payments.cashfree.com/pay/order_token/${cashfreeResponse.order_token}`;
+      console.log('Constructed URL from order token:', paymentUrl);
+    }
+
+    if (!paymentUrl) {
+      console.error('No valid payment URL found in response');
+      console.error('Available fields:', Object.keys(cashfreeResponse));
+      throw new Error('No valid payment URL received from Cashfree API');
     }
 
     console.log('Order created successfully');
@@ -118,8 +135,7 @@ serve(async (req: Request) => {
         success: true,
         data: {
           ...cashfreeResponse,
-          // Only use URLs provided directly by Cashfree API
-          payment_url: cashfreeResponse.payment_link || cashfreeResponse.checkout_url || null,
+          payment_url: paymentUrl,
           session_id: cashfreeResponse.payment_session_id
         },
         order_expiry_time: new Date(Date.now() + 30 * 60 * 1000).toISOString()
