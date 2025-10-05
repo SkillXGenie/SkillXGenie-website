@@ -40,31 +40,31 @@ const Dashboard = () => {
 
   useEffect(() => {
     getProfile();
-    getBadges();
-    checkFirstLogin();
+    // getBadges();
+    // checkFirstLogin();
   }, []);
 
-  const checkFirstLogin = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: existingBadges } = await supabase
-        .from('user_badges')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('badge_id', 'f0f0f0f0-0f0f-0f0f-0f0f-0f0f0f0f0f0f')
-        .single();
+  // const checkFirstLogin = async () => {
+  //   const { data: { user } } = await supabase.auth.getUser();
+  //   if (user) {
+  //     const { data: existingBadges } = await supabase
+  //       .from('user_badges')
+  //       .select('*')
+  //       .eq('user_id', user.id)
+  //       .eq('badge_id', 'f0f0f0f0-0f0f-0f0f-0f0f-0f0f0f0f0f0f')
+  //       .single();
 
-      if (!existingBadges) {
-        await supabase
-          .from('user_badges')
-          .insert({
-            user_id: user.id,
-            badge_id: 'f0f0f0f0-0f0f-0f0f-0f0f-0f0f0f0f0f0f'
-          });
-        getBadges(); // Refresh badges
-      }
-    }
-  };
+  //     if (!existingBadges) {
+  //       await supabase
+  //         .from('user_badges')
+  //         .insert({
+  //           user_id: user.id,
+  //           badge_id: 'f0f0f0f0-0f0f-0f0f-0f0f-0f0f0f0f0f0f'
+  //         });
+  //       getBadges(); // Refresh badges
+  //     }
+  //   }
+  // };
 
   const getProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -75,54 +75,84 @@ const Dashboard = () => {
         .eq('id', user.id)
         .single();
 
-      if (data) {
+      if (data && !error) {
         setProfile(data);
         setAvatarUrl(data.avatar_url);
+      } else {
+        // Create profile if it doesn't exist
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+
+        if (!insertError) {
+          // Fetch the newly created profile
+          const { data: newProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          
+          if (newProfile) {
+            setProfile(newProfile);
+            setAvatarUrl(newProfile.avatar_url);
+          }
+        }
       }
     }
   };
 
-  const getBadges = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase
-        .from('user_badges')
-        .select(`
-          badge_id,
-          earned_at,
-          badges (
-            id,
-            name,
-            description,
-            icon
-          )
-        `)
-        .eq('user_id', user.id);
+  // const getBadges = async () => {
+  //   const { data: { user } } = await supabase.auth.getUser();
+  //   if (user) {
+  //     const { data } = await supabase
+  //       .from('user_badges')
+  //       .select(`
+  //         badge_id,
+  //         earned_at,
+  //         badges (
+  //           id,
+  //           name,
+  //           description,
+  //           icon
+  //         )
+  //       `)
+  //       .eq('user_id', user.id);
 
-      if (data) {
-        const formattedBadges = data.map(item => ({
-          id: item.badges.id,
-          name: item.badges.name,
-          description: item.badges.description,
-          icon: item.badges.icon,
-          earned_at: item.earned_at
-        }));
-        setBadges(formattedBadges);
-      }
-    }
-  };
+  //     if (data) {
+  //       const formattedBadges = data.map(item => ({
+  //         id: item.badges.id,
+  //         name: item.badges.name,
+  //         description: item.badges.description,
+  //         icon: item.badges.icon,
+  //         earned_at: item.earned_at
+  //       }));
+  //       setBadges(formattedBadges);
+  //     }
+  //   }
+  // };
 
   const updateProfile = async (updates: Partial<Profile>) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { error } = await supabase
         .from('profiles')
-        .update(updates)
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', user.id);
 
       if (!error) {
         setProfile((prev) => ({ ...prev!, ...updates }));
         setIsEditing(false);
+        alert('Profile updated successfully!');
+      } else {
+        alert('Failed to update profile: ' + error.message);
       }
     }
   };
@@ -132,7 +162,7 @@ const Dashboard = () => {
     
     const file = event.target.files[0];
     const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
+    const fileName = `${Date.now()}.${fileExt}`;
     const filePath = `${fileName}`;
 
     const { error: uploadError } = await supabase.storage
@@ -140,7 +170,7 @@ const Dashboard = () => {
       .upload(filePath, file);
 
     if (uploadError) {
-      console.error('Error uploading avatar:', uploadError.message);
+      alert('Error uploading avatar: ' + uploadError.message);
       return;
     }
 
@@ -153,8 +183,12 @@ const Dashboard = () => {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+    const { error } = await supabase.auth.signOut();
+    if (!error) {
+      navigate('/');
+    } else {
+      alert('Error signing out: ' + error.message);
+    }
   };
 
   const stats = [
@@ -192,7 +226,7 @@ const Dashboard = () => {
             <div className="col-span-1">
               <div className="relative">
                 <img
-                  src={avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'}
+                  src={avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.name || 'User')}&background=3b82f6&color=fff&size=200`}
                   alt="Profile"
                   className="w-full h-48 object-cover rounded-lg"
                 />
@@ -243,7 +277,15 @@ const Dashboard = () => {
                     rows={4}
                   />
                   <button
-                    onClick={() => updateProfile(profile!)}
+                    onClick={() => {
+                      if (profile) {
+                        updateProfile({
+                          name: profile.name,
+                          phone: profile.phone,
+                          bio: profile.bio
+                        });
+                      }
+                    }}
                     className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                   >
                     Save Changes
@@ -263,19 +305,23 @@ const Dashboard = () => {
 
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h3 className="font-semibold mb-4">Badges Earned</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {badges.map((badge) => (
-                        <div key={badge.id} className="text-center">
-                          <img
-                            src={badge.icon}
-                            alt={badge.name}
-                            className="w-16 h-16 mx-auto mb-2"
-                          />
-                          <h4 className="font-medium text-sm">{badge.name}</h4>
-                          <p className="text-xs text-gray-500">{new Date(badge.earned_at).toLocaleDateString()}</p>
-                        </div>
-                      ))}
-                    </div>
+                    {badges.length > 0 ? (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {badges.map((badge) => (
+                          <div key={badge.id} className="text-center">
+                            <img
+                              src={badge.icon}
+                              alt={badge.name}
+                              className="w-16 h-16 mx-auto mb-2"
+                            />
+                            <h4 className="font-medium text-sm">{badge.name}</h4>
+                            <p className="text-xs text-gray-500">{new Date(badge.earned_at).toLocaleDateString()}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-center">No badges earned yet. Complete courses to earn badges!</p>
+                    )}
                   </div>
 
                   <div className="bg-gray-50 p-4 rounded-lg">

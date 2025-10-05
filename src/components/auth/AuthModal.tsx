@@ -73,27 +73,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       if (error) {
         if (error.message.includes('Email not confirmed')) {
           alert('Please verify your email before logging in. Check your inbox for the verification link.');
-          setRegistrationEmail(email);
-          setShowVerification(true);
-          setIsLogin(false);
         } else {
           alert('Login failed: ' + error.message);
         }
       } else if (authData.user) {
-        // Create or update profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: authData.user.id,
-            name: authData.user.user_metadata?.name || authData.user.email?.split('@')[0] || 'User',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-        }
-
         alert('Logged in successfully!');
         onClose();
         navigate('/dashboard');
@@ -124,9 +107,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       if (error) {
         alert('Registration failed: ' + error.message);
       } else {
-        setRegistrationEmail(email);
-        setShowVerification(true);
-        alert('Registration successful! Please check your email for a verification code.');
+        alert('Registration successful! Please check your email for a verification link.');
+        setIsLogin(true);
       }
     } catch (error) {
       console.error('Registration error:', error);
@@ -141,34 +123,18 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     const { email, token } = data;
 
     try {
-      const { data: authData, error } = await supabase.auth.verifyOtp({
+      const { error } = await supabase.auth.verifyOtp({
         email,
         token,
-        type: 'signup',
+        type: 'email',
       });
 
       if (error) {
         alert('Verification failed: ' + error.message);
-      } else if (authData.user) {
-        // Create profile after successful verification
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            name: authData.user.user_metadata?.name || authData.user.email?.split('@')[0] || 'User',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-        }
-
+      } else {
         alert('Email verified successfully! You can now log in.');
         setShowVerification(false);
         setIsLogin(true);
-        onClose();
-        navigate('/dashboard');
       }
     } catch (error) {
       console.error('Verification error:', error);
@@ -203,7 +169,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setLoading(true);
     try {
       const { error } = await supabase.auth.resend({
-        type: 'signup',
+        type: 'email',
         email: registrationEmail,
       });
 

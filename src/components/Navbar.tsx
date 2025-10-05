@@ -19,6 +19,7 @@ const Navbar = () => {
   useEffect(() => {
     getUser();
     updateCartCount();
+    
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN') {
         getUser();
@@ -27,6 +28,10 @@ const Navbar = () => {
         setProfile(null);
       }
     });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const updateCartCount = () => {
@@ -59,8 +64,31 @@ const Navbar = () => {
         .select('*')
         .eq('id', user.id)
         .single();
-      if (profile) {
+      
+      if (profile && !profile.error) {
         setProfile(profile);
+      } else {
+        // Create profile if it doesn't exist
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+
+        if (!insertError) {
+          const { data: newProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+          
+          if (newProfile) {
+            setProfile(newProfile);
+          }
+        }
       }
     }
   };
@@ -119,7 +147,7 @@ const Navbar = () => {
                   onClick={() => navigate('/dashboard')}
                 >
                   <img
-                    src={profile?.avatar_url || 'https://via.placeholder.com/40'}
+                    src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.name || user?.email?.split('@')[0] || 'User')}&background=3b82f6&color=fff&size=40`}
                     alt="Profile"
                     className="h-10 w-10 rounded-full object-cover"
                   />
@@ -152,7 +180,7 @@ const Navbar = () => {
                   onClick={() => navigate('/dashboard')}
                 >
                   <img
-                    src={profile?.avatar_url || 'https://via.placeholder.com/40'}
+                    src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.name || user?.email?.split('@')[0] || 'User')}&background=3b82f6&color=fff&size=32`}
                     alt="Profile"
                     className="h-8 w-8 rounded-full object-cover"
                   />
