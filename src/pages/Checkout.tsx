@@ -204,10 +204,18 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         console.log('Redirecting to payment URL:', paymentUrl);
         window.open(paymentUrl, '_self');
       } else if (paymentSessionId && typeof paymentSessionId === 'string') {
-        // Clean the session ID to remove any extra text
-        const cleanSessionId = paymentSessionId.includes('payment') 
-          ? paymentSessionId.split('payment')[0] 
-          : paymentSessionId;
+        // Clean the session ID to remove any extra text at the end
+        let cleanSessionId = paymentSessionId;
+        
+        // Remove any trailing "payment" text that might be duplicated
+        if (cleanSessionId.endsWith('paymentpayment')) {
+          cleanSessionId = cleanSessionId.replace(/paymentpayment$/, '');
+        } else if (cleanSessionId.endsWith('payment')) {
+          cleanSessionId = cleanSessionId.replace(/payment$/, '');
+        }
+        
+        console.log('Original session ID:', paymentSessionId);
+        console.log('Cleaned session ID:', cleanSessionId);
         
         const checkoutUrl = `https://sandbox.cashfree.com/pg/web/checkout?order_token=${cleanSessionId}`;
         console.log('Constructed checkout URL:', checkoutUrl);
