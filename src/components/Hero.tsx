@@ -100,29 +100,95 @@ const Hero = () => {
                 className="rounded-lg shadow-2xl"
               />
               
-              <div className="absolute -bottom-10 -left-10 bg-white p-6 rounded-lg shadow-xl">
+              {/* Learn by Doing Card */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20, rotateX: 15 }}
+                animate={{ opacity: 1, y: 0, rotateX: 0 }}
+                transition={{ duration: 0.8, delay: 0.5 }}
+                whileHover={{ 
+                  y: -10, 
+                  rotateX: 5, 
+                  rotateY: 5,
+                  scale: 1.05,
+                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+                }}
+                className="absolute -bottom-10 -left-10 bg-white p-6 rounded-xl shadow-2xl transform-gpu perspective-1000 hover:shadow-blue-500/20 transition-all duration-300"
+                style={{
+                  transformStyle: 'preserve-3d',
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                  border: '1px solid rgba(59, 130, 246, 0.1)'
+                }}
+              >
                 <div className="flex items-center space-x-4">
-                  <div className="bg-blue-100 p-3 rounded-full">
-                    <RocketLaunch className="h-6 w-6 text-blue-600" />
+                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-full shadow-lg">
+                    <RocketLaunch className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Learn by Doing</h3>
-                    <p className="text-sm text-gray-600">Hands-on Projects</p>
+                    <h3 className="font-bold text-gray-900">Learn by Doing</h3>
+                    <p className="text-sm text-blue-600 font-medium">Hands-on Projects</p>
                   </div>
                 </div>
-              </div>
+              </motion.div>
               
-              <div className="absolute -top-10 -right-10 bg-white p-6 rounded-lg shadow-xl">
+              {/* Expert Mentors Card */}
+              <motion.div 
+                initial={{ opacity: 0, y: -20, rotateX: -15 }}
+                animate={{ opacity: 1, y: 0, rotateX: 0 }}
+                transition={{ duration: 0.8, delay: 0.7 }}
+                whileHover={{ 
+                  y: -10, 
+                  rotateX: -5, 
+                  rotateY: -5,
+                  scale: 1.05,
+                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+                }}
+                className="absolute -top-10 -right-10 bg-white p-6 rounded-xl shadow-2xl transform-gpu perspective-1000 hover:shadow-green-500/20 transition-all duration-300"
+                style={{
+                  transformStyle: 'preserve-3d',
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)',
+                  border: '1px solid rgba(34, 197, 94, 0.1)'
+                }}
+              >
                 <div className="flex items-center space-x-4">
-                  <div className="bg-green-100 p-3 rounded-full">
-                    <Brain className="h-6 w-6 text-green-600" />
+                  <div className="bg-gradient-to-br from-green-500 to-green-600 p-3 rounded-full shadow-lg">
+                    <Brain className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Expert Mentors</h3>
-                    <p className="text-sm text-gray-600">Industry Leaders</p>
+                    <h3 className="font-bold text-gray-900">Expert Mentors</h3>
+                    <p className="text-sm text-green-600 font-medium">Industry Leaders</p>
                   </div>
                 </div>
-              </div>
+              </motion.div>
+
+              {/* Industry Leaders Card */}
+              <motion.div 
+                initial={{ opacity: 0, x: 30, rotateY: 15 }}
+                animate={{ opacity: 1, x: 0, rotateY: 0 }}
+                transition={{ duration: 0.8, delay: 0.9 }}
+                whileHover={{ 
+                  x: 10, 
+                  rotateY: 10, 
+                  rotateX: 5,
+                  scale: 1.05,
+                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+                }}
+                className="absolute top-1/2 -right-16 bg-white p-4 rounded-xl shadow-2xl transform-gpu perspective-1000 hover:shadow-purple-500/20 transition-all duration-300"
+                style={{
+                  transformStyle: 'preserve-3d',
+                  background: 'linear-gradient(135deg, #ffffff 0%, #faf5ff 100%)',
+                  border: '1px solid rgba(147, 51, 234, 0.1)'
+                }}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-2 rounded-full shadow-lg">
+                    <Users className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-sm">Industry Leaders</h3>
+                    <p className="text-xs text-purple-600 font-medium">Expert Network</p>
+                  </div>
+                </div>
+              </motion.div>
             </motion.div>
           </div>
           
