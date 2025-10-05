@@ -86,16 +86,24 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
 
   const getUser = async () => {
     try {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) {
-        console.error('Error getting user:', error.message);
-        // Don't throw error, just set user to null
+      // Check if Supabase is properly configured
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        console.error('Supabase configuration missing');
         setUser(null);
         return;
       }
-      setUser(user);
+
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error('Supabase auth error:', error);
+        // Don't throw error, just set user to null
+        setUser(null);
+      } else {
+        setUser(user);
+      }
     } catch (error) {
       console.error('Network error getting user:', error);
+      // Handle network errors gracefully
       setUser(null);
     }
   };
