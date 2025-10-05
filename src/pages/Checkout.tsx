@@ -92,6 +92,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   const [processing, setProcessing] = useState(false);
   const [cashfreeSDK, setCashfreeSDK] = useState<any>(null);
   const [sdkLoading, setSdkLoading] = useState(true);
+  const [cashfreeLoaded, setCashfreeLoaded] = useState(false);
   const [billingDetails, setBillingDetails] = useState({
     name: user?.user_metadata?.name || '',
     email: user?.email || '',
