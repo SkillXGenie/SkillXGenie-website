@@ -37,12 +37,20 @@ const courses: Course[] = [
   { id: "python-programming", title: "Python Programming", emoji: "🐍" }
 ];
 
+// Declare Cashfree global
+declare global {
+  interface Window {
+    Cashfree: any;
+  }
+}
+
 const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () => void }> = ({ 
   cartItems, 
   user, 
   onSuccess 
 }) => {
   const [processing, setProcessing] = useState(false);
+  const [cashfreeLoaded, setCashfreeLoaded] = useState(false);
   const [billingDetails, setBillingDetails] = useState({
     name: user?.user_metadata?.name || '',
     email: user?.email || '',
@@ -55,6 +63,31 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       country: 'IN'
     }
   });
+
+  useEffect(() => {
+    loadCashfreeSDK();
+  }, []);
+
+  const loadCashfreeSDK = () => {
+    // Check if already loaded
+    if (window.Cashfree) {
+      setCashfreeLoaded(true);
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+    script.async = true;
+    script.onload = () => {
+      console.log('Cashfree SDK loaded successfully');
+      setCashfreeLoaded(true);
+    };
+    script.onerror = () => {
+      console.error('Failed to load Cashfree SDK');
+      alert('Failed to load payment system. Please refresh and try again.');
+    };
+    document.head.appendChild(script);
+  };
 
   const calculatePricing = () => {
     const subtotal = cartItems.reduce((total, item) => {
@@ -98,6 +131,8 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
   const createCashfreeOrder = async (orderData: any) => {
     try {
+      console.log('Creating Cashfree order...');
+      
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-cashfree-order`, {
         method: 'POST',
         headers: {
@@ -121,6 +156,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       });
 
       const result = await response.json();
+      console.log('Cashfree order response:', result);
       
       if (!result.success) {
         throw new Error(result.error || 'Failed to create Cashfree order');
@@ -133,30 +169,35 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     }
   };
 
-  const initiateCashfreePayment = (cashfreeOrderData: any) => {
-    // Load Cashfree SDK dynamically
-    const script = document.createElement('script');
-    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
-    script.onload = () => {
-      const cashfree = (window as any).Cashfree({
-        mode: 'sandbox' // Using sandbox for testing - change to 'production' when ready
+  const initiateCashfreePayment = async (cashfreeOrderData: any) => {
+    try {
+      if (!window.Cashfree) {
+        throw new Error('Cashfree SDK not loaded');
+      }
+
+      console.log('Initiating Cashfree payment with data:', cashfreeOrderData);
+
+      const cashfree = window.Cashfree({
+        mode: 'sandbox' // Change to 'production' when ready
       });
 
       const checkoutOptions = {
         paymentSessionId: cashfreeOrderData.payment_session_id,
-        returnUrl: `${window.location.origin}/payment-success`
+        returnUrl: `${window.location.origin}/payment-success?order_id=${cashfreeOrderData.order_id}`,
+        redirectTarget: '_self' // Redirect in same window
       };
 
-      cashfree.checkout(checkoutOptions).then((result: any) => {
-        if (result.error) {
-          console.error('Payment failed:', result.error);
-          alert('Payment failed: ' + result.error.message);
-          setProcessing(false);
-        }
-        // Success will be handled by the return URL
-      });
-    };
-    document.head.appendChild(script);
+      console.log('Checkout options:', checkoutOptions);
+
+      // Use redirect method for better compatibility
+      const result = await cashfree.redirect(checkoutOptions);
+      
+      console.log('Cashfree redirect result:', result);
+
+    } catch (error) {
+      console.error('Payment initiation error:', error);
+      throw error;
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -167,9 +208,21 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       return;
     }
 
+    if (!billingDetails.address.line1 || !billingDetails.address.city || !billingDetails.address.state) {
+      alert('Please fill in all address fields');
+      return;
+    }
+
+    if (!cashfreeLoaded) {
+      alert('Payment system is still loading. Please wait and try again.');
+      return;
+    }
+
     setProcessing(true);
 
     try {
+      console.log('Starting payment process...');
+
       // First, save order to database
       const orderNumber = generateOrderNumber();
       const orderData = {
@@ -188,13 +241,16 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         subtotal: subtotal * 100, // Convert to paise
         gst_amount: gst * 100, // Convert to paise
         total_amount: total * 100, // Convert to paise
-        payment_status: 'pending'
+        payment_status: 'pending',
+        created_at: new Date().toISOString()
       };
 
+      console.log('Saving order to database...');
       const savedOrder = await saveOrderToDatabase(orderData);
       console.log('Order saved:', savedOrder);
 
       // Create Cashfree order
+      console.log('Creating Cashfree order...');
       const cashfreeOrderData = await createCashfreeOrder(orderData);
       console.log('Cashfree order created:', cashfreeOrderData);
 
@@ -206,12 +262,15 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         })
         .eq('id', savedOrder.id);
 
+      console.log('Order updated with Cashfree ID');
+
       // Initiate Cashfree payment
-      initiateCashfreePayment(cashfreeOrderData);
+      console.log('Initiating payment...');
+      await initiateCashfreePayment(cashfreeOrderData);
 
     } catch (error) {
       console.error('Payment error:', error);
-      alert('Payment failed. Please try again.');
+      alert(`Payment failed: ${error.message}. Please try again.`);
       setProcessing(false);
     }
   };
@@ -368,16 +427,31 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         </div>
       </div>
 
+      {/* SDK Loading Status */}
+      {!cashfreeLoaded && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600 mr-2"></div>
+            <span className="text-yellow-800">Loading payment system...</span>
+          </div>
+        </div>
+      )}
+
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={processing}
+        disabled={processing || !cashfreeLoaded}
         className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 px-6 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
       >
         {processing ? (
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
             Processing Payment...
+          </div>
+        ) : !cashfreeLoaded ? (
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+            Loading Payment System...
           </div>
         ) : (
           <div className="flex items-center justify-center">
@@ -393,6 +467,9 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
           <span>Secured by Cashfree</span>
         </div>
         <p>Your payment is protected by industry-standard encryption</p>
+        <p className="text-xs mt-1 text-yellow-600">
+          🧪 Sandbox Mode - Use test cards for payment
+        </p>
       </div>
     </form>
   );
