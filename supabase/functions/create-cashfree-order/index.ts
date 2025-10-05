@@ -120,6 +120,7 @@ serve(async (req: Request) => {
           ...cashfreeResponse,
           payment_url: cashfreeResponse.payment_session_id 
             ? `https://payments.cashfree.com/pay/${cashfreeResponse.payment_session_id}`
+            : null,
           payment_methods: "cc,dc,ppc,ccc,emi,paypal,upi,nb,app,paylater"
         },
         order_expiry_time: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutes from now
