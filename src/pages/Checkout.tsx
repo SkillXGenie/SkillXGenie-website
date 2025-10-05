@@ -65,29 +65,13 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   });
 
   useEffect(() => {
-    loadCashfreeSDK();
+    // Remove SDK loading since we're using direct redirect
   }, []);
 
-  const loadCashfreeSDK = () => {
-    // Check if already loaded
-    if (window.Cashfree) {
-      setCashfreeLoaded(true);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
-    script.async = true;
-    script.onload = () => {
-      console.log('Cashfree SDK loaded successfully');
-      setCashfreeLoaded(true);
-    };
-    script.onerror = () => {
-      console.error('Failed to load Cashfree SDK');
-      alert('Failed to load payment system. Please refresh and try again.');
-    };
-    document.head.appendChild(script);
-  };
+  // Set cashfreeLoaded to true since we don't need the SDK
+  useEffect(() => {
+    setCashfreeLoaded(true);
+  }, []);
 
   const calculatePricing = () => {
     const subtotal = cartItems.reduce((total, item) => {
@@ -171,38 +155,15 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
   const initiateCashfreePayment = async (cashfreeOrderData: any) => {
     try {
-      if (!window.Cashfree) {
-        throw new Error('Cashfree SDK not loaded');
-      }
-
       console.log('Initiating Cashfree payment with data:', cashfreeOrderData);
 
-      const cashfree = new window.Cashfree({
-        mode: 'sandbox' // Change to 'production' when ready
-      });
-
-      const checkoutOptions = {
-        paymentSessionId: cashfreeOrderData.payment_session_id,
-        returnUrl: `${window.location.origin}/payment-success?order_id=${cashfreeOrderData.order_id}`,
-      };
-
-      console.log('Checkout options:', checkoutOptions);
-
-      // Try checkout method first, with fallback to manual redirect
-      try {
-        console.log('Attempting Cashfree checkout...');
-        const result = await cashfree.checkout(checkoutOptions);
-        console.log('Cashfree checkout result:', result);
-      } catch (checkoutError) {
-        console.error('Cashfree checkout failed, trying manual redirect:', checkoutError);
-        
-        // Fallback: redirect to Cashfree payment page manually
-        if (cashfreeOrderData.payment_link) {
-          console.log('Redirecting to payment link:', cashfreeOrderData.payment_link);
-          window.location.href = cashfreeOrderData.payment_link;
-        } else {
-          throw new Error('No payment link available for redirect');
-        }
+      // Direct redirect to Cashfree payment page
+      if (cashfreeOrderData.payment_link) {
+        console.log('Redirecting to payment link:', cashfreeOrderData.payment_link);
+        // Use window.open with _self to avoid popup blockers
+        window.open(cashfreeOrderData.payment_link, '_self');
+      } else {
+        throw new Error('No payment link available for redirect');
       }
       
     } catch (error) {
@@ -474,30 +435,17 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       </div>
 
       {/* SDK Loading Status */}
-      {!cashfreeLoaded && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600 mr-2"></div>
-            <span className="text-yellow-800">Loading payment system...</span>
-          </div>
-        </div>
-      )}
 
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={processing || !cashfreeLoaded}
+        disabled={processing}
         className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 px-6 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
       >
         {processing ? (
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
             Processing Payment...
-          </div>
-        ) : !cashfreeLoaded ? (
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-            Loading Payment System...
           </div>
         ) : (
           <div className="flex items-center justify-center">
