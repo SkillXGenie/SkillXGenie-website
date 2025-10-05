@@ -99,8 +99,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         password,
         options: {
           data: {
-            name: name,
-            full_name: name
+            name: name
           },
           emailRedirectTo: `${window.location.origin}/dashboard`
         }
