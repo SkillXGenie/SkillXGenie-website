@@ -64,6 +64,13 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setLoading(true);
     const { email, password } = data;
 
+    // Check if Supabase is configured
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      alert('Authentication is not configured. Please contact support.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data: authData, error } = await supabase.auth.signInWithPassword({ 
         email, 
@@ -96,6 +103,13 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const handleRegister = async (data: RegisterFormData) => {
     setLoading(true);
     const { name, email, password } = data;
+
+    // Check if Supabase is configured
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      alert('Authentication is not configured. Please contact support.');
+      setLoading(false);
+      return;
+    }
 
     try {
       const { error } = await supabase.auth.signUp({

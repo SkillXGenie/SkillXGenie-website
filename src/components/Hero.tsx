@@ -2,13 +2,21 @@ import { motion } from 'framer-motion';
 import { TypeAnimation } from 'react-type-animation';
 import { Rocket as RocketLaunch, Brain, Users, Code, Calculator, Briefcase, CheckCircle, Trophy, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AuthModal from './auth/AuthModal';
 
 
 const Hero = () => {
   const navigate = useNavigate();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isSupabaseConfigured, setIsSupabaseConfigured] = useState(false);
+
+  useEffect(() => {
+    // Check if Supabase is properly configured
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    setIsSupabaseConfigured(!!(supabaseUrl && supabaseKey));
+  }, []);
 
   const features = [
     {
@@ -367,7 +375,13 @@ const Hero = () => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
-              onClick={() => setIsAuthModalOpen(true)}
+              onClick={() => {
+                if (isSupabaseConfigured) {
+                  setIsAuthModalOpen(true);
+                } else {
+                  alert('Authentication is not configured. Please contact support.');
+                }
+              }}
             >
               Get Started Today
             </motion.button>

@@ -559,43 +559,32 @@ const Checkout = () => {
 
   const getUser = async () => {
     try {
-      // Add timeout to prevent hanging requests
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
+      // Check if Supabase is configured
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        console.warn('Supabase not configured, redirecting to courses');
+        navigate('/courses');
+        return;
+      }
+
       const { data: { user }, error } = await supabase.auth.getUser();
-      clearTimeout(timeoutId);
       
-      if (error) {
-        console.error('Supabase auth error:', error);
-        console.error('Error details:', {
-          message: error.message,
-          status: error.status,
-          statusText: error.statusText
-        });
+      if (error && error.message !== 'Authentication not configured') {
+        console.error('Error getting user:', error);
         navigate('/courses');
         return;
       }
+      
       if (!user) {
-        console.log('No user found, redirecting to courses');
         navigate('/courses');
         return;
       }
+      
       setUser(user);
       setLoading(false);
     } catch (error) {
-      console.error('Network error getting user:', error);
-      console.error('Error type:', error.name);
-      console.error('Error message:', error.message);
-      console.error('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-      console.error('Supabase Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
-      
-      // Check if it's a network error
-      if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-        console.error('Network connectivity issue detected');
-        alert('Unable to connect to the server. Please check your internet connection and try again.');
+      if (error.message !== 'Authentication not configured') {
+        console.error('Error getting user:', error);
       }
-      
       navigate('/courses');
     }
   };

@@ -57,12 +57,19 @@ const Dashboard = () => {
 
   const getProfile = async () => {
     try {
+      // Check if Supabase is configured
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        navigate('/');
+        return;
+      }
+
       const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) {
+      if (error && error.message !== 'Authentication not configured') {
         console.error('Error getting user:', error);
         navigate('/');
         return;
       }
+      
       if (user) {
         // Create a basic profile from user data
         const basicProfile = {
@@ -77,7 +84,9 @@ const Dashboard = () => {
         navigate('/');
       }
     } catch (error) {
-      console.error('Error getting user:', error);
+      if (error.message !== 'Authentication not configured') {
+        console.error('Error getting user:', error);
+      }
       navigate('/');
     }
   };
