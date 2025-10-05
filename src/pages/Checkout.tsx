@@ -247,15 +247,18 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
       // Ensure user profile exists before creating order
       if (user?.id) {
+        console.log('Checking if profile exists for user:', user.id);
         const { data: existingProfile } = await supabase
           .from('profiles')
           .select('id')
           .eq('id', user.id)
           .single();
 
+        console.log('Existing profile:', existingProfile);
         if (!existingProfile) {
+          console.log('Creating new profile for user:', user.id);
           // Create profile if it doesn't exist
-          await supabase
+          const { error: profileError } = await supabase
             .from('profiles')
             .insert({
               id: user.id,
@@ -263,6 +266,13 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString()
             });
+          
+          if (profileError) {
+            console.error('Error creating profile:', profileError);
+            throw new Error(`Failed to create user profile: ${profileError.message}`);
+          }
+          
+          console.log('Profile created successfully');
         }
       }
 
