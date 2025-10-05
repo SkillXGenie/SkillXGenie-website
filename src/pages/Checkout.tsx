@@ -152,7 +152,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         order_meta: {
           return_url: `${window.location.origin}/payment-success`,
           notify_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook`,
-          payment_methods: "cc,dc,nb,upi,paylater,emi,cardlessemi,debitcardemi,paypal,app,wallet"
+          payment_methods: "cc,dc,ppc,ccc,emi,paypal,upi,nb,app,paylater"
         }
       };
 
