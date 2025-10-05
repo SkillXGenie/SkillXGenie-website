@@ -38,8 +38,8 @@ serve(async (req: Request) => {
 
     // Get Cashfree credentials from Supabase secrets
     const CASHFREE_ENVIRONMENT = "sandbox" // Set to "production" for live environment
-    const CASHFREE_APP_ID = Deno.env.get(`CASHFREE_${CASHFREE_ENVIRONMENT.toUpperCase()}_APP_ID`) || Deno.env.get("CASHFREE_ENVIRONMENT_APPID")
-    const CASHFREE_SECRET_KEY = Deno.env.get(`CASHFREE_${CASHFREE_ENVIRONMENT.toUpperCase()}_SECRET_KEY`) || Deno.env.get("CASHFREE_ENVIRONMENT_SECRET_KEY")
+    const CASHFREE_APP_ID = Deno.env.get("CASHFREE_SANDBOX_APP_ID") || "109178405a18187e2ca902bb2d44871901"
+    const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_SANDBOX_SECRET_KEY") || "cfsk_ma_test_109178405a18187e2ca902bb2d44871901_ec5f3999"
 
     console.log('Environment check:', {
       hasAppId: !!CASHFREE_APP_ID,
