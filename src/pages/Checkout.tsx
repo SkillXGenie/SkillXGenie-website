@@ -27,12 +27,22 @@ interface Course {
   emoji: string;
 }
 
-interface PaymentMethod {
-  id: string;
-  name: string;
-  icon: string;
-  description: string;
+// Declare Cashfree global type
+declare global {
+  interface Window {
+    Cashfree: {
+      load: (config: { mode: string }) => Promise<any>;
+      checkout: (options: {
+        paymentSessionId: string;
+        returnUrl?: string;
+        onSuccess?: (data: any) => void;
+        onFailure?: (data: any) => void;
+        onClose?: () => void;
+      }) => void;
+    };
+  }
 }
+
 const courses: Course[] = [
   { id: "business-essentials", title: "Business Essentials", emoji: "💼" },
   { id: "spoken-english", title: "Spoken English Mastery", emoji: "🗣️" },
@@ -43,56 +53,15 @@ const courses: Course[] = [
   { id: "python-programming", title: "Python Programming", emoji: "🐍" }
 ];
 
-const paymentMethods: PaymentMethod[] = [
-  {
-    id: 'card',
-    name: 'Credit/Debit Card',
-    icon: '💳',
-    description: 'Visa, Mastercard, RuPay'
-  },
-  {
-    id: 'upi',
-    name: 'UPI',
-    icon: '📱',
-    description: 'Google Pay, PhonePe, Paytm'
-  },
-  {
-    id: 'netbanking',
-    name: 'Net Banking',
-    icon: '🏦',
-    description: 'All major banks'
-  },
-  {
-    id: 'wallet',
-    name: 'Wallet',
-    icon: '👛',
-    description: 'Paytm, Mobikwik, etc.'
-  }
-];
-// Declare Cashfree global
-declare global {
-  interface Window {
-    Cashfree: {
-      load: (config: { mode: string }) => Promise<any>;
-      pay: (options: {
-        orderToken: string;
-        onSuccess: (data: any) => void;
-        onFailure: (data: any) => void;
-        onClose: () => void;
-      }) => void;
-    };
-  }
-}
-
 const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () => void }> = ({ 
   cartItems, 
   user, 
   onSuccess 
 }) => {
+  // State management
   const [processing, setProcessing] = useState(false);
   const [cashfreeSDK, setCashfreeSDK] = useState<any>(null);
   const [sdkLoading, setSdkLoading] = useState(true);
-  const [cashfreeLoaded, setCashfreeLoaded] = useState(false);
   const [billingDetails, setBillingDetails] = useState({
     name: user?.user_metadata?.name || '',
     email: user?.email || '',
@@ -106,21 +75,43 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     }
   });
 
+  // Initialize Cashfree SDK on component mount
   useEffect(() => {
-    const checkCashfreeSDK = () => {
-      if (window.Cashfree) {
-        setCashfreeLoaded(true);
-        console.log('Cashfree SDK is available');
-      } else {
-        console.log('Waiting for Cashfree SDK to load...');
-        setTimeout(checkCashfreeSDK, 100);
-      }
-    };
-    
-    checkCashfreeSDK();
+    initializeCashfreeSDK();
   }, []);
 
+  /**
+   * Initialize Cashfree SDK in production mode
+   * This must be called before any payment operations
+   */
+  const initializeCashfreeSDK = async () => {
+    try {
+      console.log('🔄 Initializing Cashfree SDK in production mode...');
+      setSdkLoading(true);
 
+      // Check if Cashfree is available on window
+      if (!window.Cashfree) {
+        console.error('❌ Cashfree SDK not found on window object');
+        alert('Payment system not available. Please refresh the page.');
+        return;
+      }
+
+      // Load SDK in production mode
+      const sdk = await window.Cashfree.load({ mode: "production" });
+      setCashfreeSDK(sdk);
+      console.log('✅ Cashfree SDK loaded successfully in production mode');
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize Cashfree SDK:', error);
+      alert('Failed to load payment system. Please refresh the page and try again.');
+    } finally {
+      setSdkLoading(false);
+    }
+  };
+
+  /**
+   * Calculate pricing with GST
+   */
   const calculatePricing = () => {
     const subtotal = cartItems.reduce((total, item) => {
       const price = parseInt(item.price.replace('₹', '').replace(',', ''));
@@ -135,12 +126,18 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
   const { subtotal, gst, total } = calculatePricing();
 
+  /**
+   * Generate unique order number
+   */
   const generateOrderNumber = () => {
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     return `ORD-${date}-${random}`;
   };
 
+  /**
+   * Save order to database
+   */
   const saveOrderToDatabase = async (orderData: any) => {
     try {
       const { data, error } = await supabase
@@ -150,29 +147,37 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         .single();
 
       if (error) {
-        console.error('Error saving order:', error);
+        console.error('❌ Error saving order:', error);
         throw error;
       }
 
+      console.log('✅ Order saved to database:', data.id);
       return data;
     } catch (error) {
-      console.error('Database error:', error);
+      console.error('❌ Database error:', error);
       throw error;
     }
   };
 
-  const createCashfreeOrder = async () => {
+  /**
+   * Create fresh Cashfree order token
+   * This is called on every payment attempt to ensure fresh token
+   */
+  const createFreshOrderToken = async () => {
     try {
-      console.log('Creating Cashfree order...');
+      console.log('🔄 Creating fresh Cashfree order token...');
 
       // Check if Supabase is configured
       if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        // For demo purposes, simulate a successful payment
-        alert('Payment integration is not configured. This is a demo - redirecting to success page.');
-        window.location.href = `${window.location.origin}/payment-success?order_id=demo_${Date.now()}&status=success`;
-        return;
+        // Demo mode - simulate successful payment
+        console.log('⚠️ Demo mode: Simulating payment success');
+        setTimeout(() => {
+          window.location.href = `${window.location.origin}/payment-success?order_id=demo_${Date.now()}&status=success`;
+        }, 2000);
+        return null;
       }
 
+      // Prepare order data for backend
       const orderData = {
         order_amount: total,
         order_currency: 'INR',
@@ -188,10 +193,9 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         }
       };
 
-      console.log('Calling Supabase Edge Function...');
-      console.log('Edge Function URL:', `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-cashfree-order`);
+      console.log('📤 Sending order request to backend...');
       
-      // Add timeout to prevent hanging
+      // Create order via Supabase Edge Function with timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
@@ -207,19 +211,14 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       
       clearTimeout(timeoutId);
 
-      console.log('Edge Function Response Status:', response.status);
-      console.log('Edge Function Response Headers:', Object.fromEntries(response.headers.entries()));
-      
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Edge function error:', errorText);
-        console.error('Response status:', response.status);
-        console.error('Response statusText:', response.statusText);
-        throw new Error(`Failed to create payment order: ${errorText}`);
+        console.error('❌ Backend error:', errorText);
+        throw new Error(`Backend error: ${errorText}`);
       }
 
       const result = await response.json();
-      console.log('Cashfree order created:', result);
+      console.log('✅ Fresh order token received:', result);
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to create payment order');
@@ -229,16 +228,25 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
     } catch (error) {
       if (error.name === 'AbortError') {
-        throw new Error('Request timeout - please check your internet connection and try again');
+        throw new Error('Request timeout - please check your connection and try again');
       }
-      console.error('Error creating Cashfree order:', error);
+      console.error('❌ Error creating order token:', error);
       throw error;
     }
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  /**
+   * Handle payment process
+   * This is the main payment handler called directly from user click
+   */
+  const handlePayment = async () => {
+    // Prevent multiple rapid clicks
+    if (processing) {
+      console.log('⚠️ Payment already in progress, ignoring click');
+      return;
+    }
 
+    // Validate form data
     if (!billingDetails.name || !billingDetails.email || !billingDetails.phone) {
       alert('Please fill in all required fields');
       return;
@@ -249,12 +257,17 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       return;
     }
 
+    // Check if SDK is ready
+    if (!cashfreeSDK) {
+      alert('Payment system not ready. Please wait a moment and try again.');
+      return;
+    }
+
     setProcessing(true);
+    console.log('🚀 Starting payment process...');
 
     try {
-      console.log('Starting payment process...');
-
-      // First, save order to database
+      // Step 1: Save order to database first
       const orderNumber = generateOrderNumber();
       const orderData = {
         user_id: user?.id || null,
@@ -276,53 +289,40 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         created_at: new Date().toISOString()
       };
 
-      // Ensure user profile exists before creating order
-      if (user?.id) {
-        console.log('Checking if profile exists for user:', user.id);
-        
-        if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
-          const { data: existingProfile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', user.id)
-            .single();
+      // Create user profile if needed
+      if (user?.id && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .single();
 
-          console.log('Existing profile:', existingProfile);
-          if (!existingProfile) {
-            console.log('Creating new profile for user:', user.id);
-            // Create profile if it doesn't exist
-            const { error: profileError } = await supabase
-              .from('profiles')
-              .insert({
-                id: user.id,
-                name: billingDetails.name,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              });
-            
-            if (profileError) {
-              console.error('Error creating profile:', profileError);
-              throw new Error(`Failed to create user profile: ${profileError.message}`);
-            }
-            
-            console.log('Profile created successfully');
-          }
+        if (!existingProfile) {
+          await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              name: billingDetails.name,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
         }
       }
 
-      console.log('Saving order to database...');
       let savedOrder;
       if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
         savedOrder = await saveOrderToDatabase(orderData);
       }
-      console.log('Order saved:', savedOrder);
 
-      // Create Cashfree order
-      console.log('Creating Cashfree payment order...');
-      const cashfreeOrder = await createCashfreeOrder();
-      console.log('Cashfree order created:', cashfreeOrder);
+      // Step 2: Create fresh order token
+      const cashfreeOrder = await createFreshOrderToken();
+      
+      if (!cashfreeOrder) {
+        // Demo mode already handled
+        return;
+      }
 
-      // Update order with Cashfree order details if database is available
+      // Step 3: Update order with Cashfree details
       if (savedOrder && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
         await supabase
           .from('orders')
@@ -334,51 +334,44 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
           .eq('id', savedOrder.id);
       }
 
-      console.log('Order updated with Cashfree details');
-
-      // Clear cart
+      // Step 4: Clear cart before opening popup
       localStorage.removeItem('courseCart');
 
-      // Initialize Cashfree SDK and open payment popup
-      if (!window.Cashfree) {
-        throw new Error('Cashfree SDK not loaded. Please refresh the page and try again.');
-      }
+      // Step 5: Open Cashfree payment popup
+      console.log('🎯 Opening Cashfree payment popup with session ID:', cashfreeOrder.payment_session_id || cashfreeOrder.order_token);
       
-      console.log('Initializing Cashfree SDK...');
-      const cashfree = window.Cashfree({ mode: "production" });
-      
-      console.log('Opening Cashfree payment popup with order token:', cashfreeOrder.order_token);
-      
-      // Add a small delay to ensure everything is ready
+      // Small delay to ensure everything is ready
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      cashfree.pay({
-        orderToken: cashfreeOrder.order_token,
+      // Open payment popup using the SDK
+      cashfreeSDK.checkout({
+        paymentSessionId: cashfreeOrder.payment_session_id || cashfreeOrder.order_token,
+        returnUrl: `${window.location.origin}/payment-success`,
         onSuccess: (data: any) => {
-          console.log("Payment Success:", data);
+          console.log('✅ Payment Success:', data);
           setProcessing(false);
           window.location.href = `${window.location.origin}/payment-success?order_id=${cashfreeOrder.order_id}&status=success`;
         },
         onFailure: (data: any) => {
-          console.log("Payment Failed:", data);
+          console.log('❌ Payment Failed:', data);
           alert('Payment failed. Please try again.');
           setProcessing(false);
         },
         onClose: () => {
-          console.log("Payment popup closed");
+          console.log('🔒 Payment popup closed by user');
           setProcessing(false);
         }
       });
 
     } catch (error) {
-      console.error('Payment error:', error);
+      console.error('❌ Payment error:', error);
       alert(`Payment failed: ${error.message || 'Unknown error occurred'}. Please try again.`);
       setProcessing(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={(e) => { e.preventDefault(); handlePayment(); }} className="space-y-6">
       {/* Billing Details */}
       <div className="bg-white rounded-xl p-6 shadow-lg">
         <h3 className="text-lg font-semibold mb-4 flex items-center">
@@ -576,11 +569,10 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         </div>
       </div>
 
-
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={processing || sdkLoading || !cashfreeSDK}
+        disabled={processing || sdkLoading}
         className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 px-6 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
       >
         {processing ? (
@@ -592,10 +584,6 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
             Loading Payment System...
-          </div>
-        ) : !cashfreeSDK ? (
-          <div className="flex items-center justify-center">
-            <span className="text-red-200">Payment System Unavailable</span>
           </div>
         ) : (
           <div className="flex items-center justify-center">

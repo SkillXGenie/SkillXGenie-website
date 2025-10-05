@@ -21,6 +21,16 @@ interface OrderRequest {
   }
 }
 
+/**
+ * Cashfree Order Creation Edge Function
+ * 
+ * This function creates a fresh Cashfree order token for each payment request.
+ * It uses production Cashfree API endpoints and credentials.
+ * 
+ * Environment Variables Required:
+ * - CASHFREE_PRODUCTION_APPID: Your Cashfree production App ID
+ * - CASHFREE_PRODUCTION_SECRET_KEY: Your Cashfree production Secret Key
+ */
 serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -31,53 +41,78 @@ serve(async (req: Request) => {
   }
 
   try {
-    console.log('Received request to create Cashfree order');
+    console.log('🚀 [Cashfree] Received request to create fresh order token');
     
     const { order_amount, order_currency, customer_details, order_meta }: OrderRequest = await req.json()
-    console.log('Order request data:', { order_amount, order_currency, customer_details: { ...customer_details, customer_phone: customer_details.customer_phone ? 'PROVIDED' : 'MISSING' } });
+    
+    // Log request details (without sensitive data)
+    console.log('📋 [Cashfree] Order request details:', {
+      order_amount,
+      order_currency,
+      customer_name: customer_details.customer_name,
+      customer_email: customer_details.customer_email,
+      has_phone: !!customer_details.customer_phone,
+      return_url: order_meta.return_url
+    });
 
     // Get Cashfree production credentials from environment variables
     const CASHFREE_APP_ID = Deno.env.get("CASHFREE_PRODUCTION_APPID")
     const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_PRODUCTION_SECRET_KEY")
 
-    console.log('Environment check:', {
+    console.log('🔐 [Cashfree] Environment check:', {
       hasAppId: !!CASHFREE_APP_ID,
       hasSecretKey: !!CASHFREE_SECRET_KEY,
       environment: "production"
     });
 
+    // Validate credentials
     if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
-      const errorMsg = "Cashfree production credentials not configured. Please check CASHFREE_PRODUCTION_APPID and CASHFREE_PRODUCTION_SECRET_KEY in Supabase secrets."
+      const errorMsg = "❌ Cashfree production credentials not configured. Please check CASHFREE_PRODUCTION_APPID and CASHFREE_PRODUCTION_SECRET_KEY in Supabase secrets."
       console.error(errorMsg);
       throw new Error(errorMsg)
     }
 
-    // Generate unique order ID
-    const order_id = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    console.log('Generated order ID:', order_id);
+    // Generate unique order ID with timestamp for uniqueness
+    const timestamp = Date.now()
+    const randomSuffix = Math.random().toString(36).substr(2, 9)
+    const order_id = `order_${timestamp}_${randomSuffix}`
+    
+    console.log('🆔 [Cashfree] Generated unique order ID:', order_id);
 
-    // Cashfree API endpoint
+    // Cashfree production API endpoint
     const cashfreeUrl = "https://api.cashfree.com/pg/orders"
+    console.log('🌐 [Cashfree] Using production API URL:', cashfreeUrl);
 
-    console.log('Using Cashfree URL:', cashfreeUrl);
+    // Validate return URL is HTTPS (required for production)
+    if (!order_meta.return_url.startsWith('https://')) {
+      console.warn('⚠️ [Cashfree] Return URL should be HTTPS for production:', order_meta.return_url);
+    }
 
-    // Create order payload
+    // Create order payload for Cashfree API
     const orderPayload = {
       order_id,
       order_amount,
       order_currency,
-      customer_details,
-      order_meta
+      customer_details: {
+        customer_id: customer_details.customer_id,
+        customer_name: customer_details.customer_name,
+        customer_email: customer_details.customer_email,
+        customer_phone: customer_details.customer_phone || "+919999999999" // Fallback phone
+      },
+      order_meta: {
+        return_url: order_meta.return_url,
+        notify_url: order_meta.notify_url
+      }
     }
 
-    console.log('Order payload:', { ...orderPayload, customer_details: { ...customer_details, customer_phone: customer_details.customer_phone ? 'PROVIDED' : 'MISSING' } });
+    console.log('📤 [Cashfree] Sending order payload to Cashfree API...');
 
-    // Make request to Cashfree
-    console.log('Making request to Cashfree API...');
-    
-    // Add timeout to prevent hanging
+    // Make request to Cashfree with timeout protection
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+    const timeoutId = setTimeout(() => {
+      console.error('⏰ [Cashfree] Request timeout after 25 seconds');
+      controller.abort();
+    }, 25000); // 25 second timeout
     
     const response = await fetch(cashfreeUrl, {
       method: "POST",
@@ -93,46 +128,62 @@ serve(async (req: Request) => {
     
     clearTimeout(timeoutId);
 
-    console.log('Cashfree API response status:', response.status);
-    const responseText = await response.text()
-    console.log('Cashfree API raw response:', responseText);
+    console.log('📨 [Cashfree] API response status:', response.status);
     
+    // Get response text first
+    const responseText = await response.text()
+    console.log('📄 [Cashfree] Raw API response:', responseText.substring(0, 500) + '...');
+    
+    // Parse JSON response
     let cashfreeResponse;
     try {
       cashfreeResponse = JSON.parse(responseText);
     } catch (parseError) {
-      console.error('Failed to parse Cashfree response:', parseError);
-      throw new Error(`Invalid response from Cashfree API: ${responseText}`);
+      console.error('❌ [Cashfree] Failed to parse API response:', parseError);
+      throw new Error(`Invalid JSON response from Cashfree API: ${responseText.substring(0, 200)}`);
     }
-    
-    console.log('Cashfree API response:', cashfreeResponse);
 
+    // Check if request was successful
     if (!response.ok) {
-      const errorMsg = `Cashfree API error: ${cashfreeResponse.message || JSON.stringify(cashfreeResponse)}`
+      const errorMsg = `❌ [Cashfree] API error (${response.status}): ${cashfreeResponse.message || JSON.stringify(cashfreeResponse)}`
       console.error(errorMsg);
       throw new Error(errorMsg)
     }
 
-    // Check for different possible response formats
+    // Extract order token/session ID from response
+    // Cashfree may return different field names in different API versions
     const orderToken = cashfreeResponse.order_token || cashfreeResponse.payment_session_id;
     const orderId = cashfreeResponse.order_id || cashfreeResponse.cf_order_id;
     
+    console.log('🔍 [Cashfree] Response analysis:', {
+      has_order_token: !!cashfreeResponse.order_token,
+      has_payment_session_id: !!cashfreeResponse.payment_session_id,
+      has_order_id: !!orderId,
+      response_keys: Object.keys(cashfreeResponse)
+    });
+
+    // Validate that we received a token
     if (!orderToken) {
-      console.error('No order_token received from Cashfree API');
-      console.error('Response:', cashfreeResponse);
-      throw new Error(`No order_token received from Cashfree API. Response: ${JSON.stringify(cashfreeResponse)}`);
+      console.error('❌ [Cashfree] No order token received from API');
+      console.error('📋 [Cashfree] Full response:', cashfreeResponse);
+      throw new Error(`No order token received from Cashfree API. Response: ${JSON.stringify(cashfreeResponse)}`);
     }
 
-    console.log('Order created successfully');
+    console.log('✅ [Cashfree] Order created successfully!');
+    console.log('🎫 [Cashfree] Order token:', orderToken.substring(0, 20) + '...');
+    
+    // Return success response with order details
     return new Response(
       JSON.stringify({
         success: true,
         data: {
           order_id: orderId,
           order_token: orderToken,
-          payment_session_id: cashfreeResponse.payment_session_id
+          payment_session_id: orderToken, // For compatibility
+          cf_order_id: orderId
         },
-        order_expiry_time: new Date(Date.now() + 30 * 60 * 1000).toISOString()
+        order_expiry_time: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes from now
+        message: "Fresh order token created successfully"
       }),
       {
         headers: {
@@ -143,12 +194,13 @@ serve(async (req: Request) => {
     )
 
   } catch (error) {
+    // Handle timeout errors
     if (error.name === 'AbortError') {
-      console.error("Cashfree API request timeout");
+      console.error("⏰ [Cashfree] Request timeout - API not responding");
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Request timeout - Cashfree API is not responding"
+          error: "Request timeout - Cashfree API is not responding. Please try again."
         }),
         {
           status: 408,
@@ -160,12 +212,13 @@ serve(async (req: Request) => {
       )
     }
     
-    console.error("Error creating Cashfree order:", error)
+    // Handle all other errors
+    console.error("❌ [Cashfree] Error creating order:", error)
     
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error.message || "Unknown error occurred while creating payment order"
       }),
       {
         status: 500,
