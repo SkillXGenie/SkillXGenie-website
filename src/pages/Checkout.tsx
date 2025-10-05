@@ -157,13 +157,27 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     try {
       console.log('Initiating Cashfree payment with data:', cashfreeOrderData);
 
-      // Direct redirect to Cashfree payment page
-      if (cashfreeOrderData.payment_link) {
-        console.log('Redirecting to payment link:', cashfreeOrderData.payment_link);
-        // Use window.open with _self to avoid popup blockers
-        window.open(cashfreeOrderData.payment_link, '_self');
+      // Check for different possible payment URL fields
+      const paymentUrl = cashfreeOrderData.payment_link || 
+                        cashfreeOrderData.payment_session_id || 
+                        cashfreeOrderData.checkout_url ||
+                        cashfreeOrderData.payment_url;
+      
+      if (paymentUrl) {
+        console.log('Redirecting to payment URL:', paymentUrl);
+        
+        // If it's a session ID, construct the Cashfree checkout URL
+        if (cashfreeOrderData.payment_session_id && !paymentUrl.startsWith('http')) {
+          const checkoutUrl = `https://sandbox.cashfree.com/pg/web/checkout?order_token=${cashfreeOrderData.payment_session_id}`;
+          console.log('Constructed checkout URL:', checkoutUrl);
+          window.open(checkoutUrl, '_self');
+        } else {
+          // Direct redirect for full URLs
+          window.open(paymentUrl, '_self');
+        }
       } else {
-        throw new Error('No payment link available for redirect');
+        console.error('Available fields in Cashfree response:', Object.keys(cashfreeOrderData));
+        throw new Error(`No payment URL found. Available fields: ${Object.keys(cashfreeOrderData).join(', ')}`);
       }
       
     } catch (error) {
