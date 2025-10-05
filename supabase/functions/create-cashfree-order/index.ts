@@ -34,12 +34,12 @@ serve(async (req: Request) => {
     const { order_amount, order_currency, customer_details, order_meta }: OrderRequest = await req.json()
 
     // Get Cashfree credentials from Supabase secrets
-    const CASHFREE_APP_ID = Deno.env.get("CASHFREE_APP_ID")
-    const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_SECRET_KEY")
+    const CASHFREE_APP_ID = Deno.env.get("CASHFREE_ENVIRONMENT_APPID")
+    const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_ENVIRONMENT_SECRET_KEY")
     const CASHFREE_ENVIRONMENT = "sandbox" // Using sandbox for testing
 
     if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
-      throw new Error("Cashfree credentials not configured")
+      throw new Error("Cashfree credentials not configured. Please check CASHFREE_ENVIRONMENT_APPID and CASHFREE_ENVIRONMENT_SECRET_KEY in Supabase secrets.")
     }
 
     // Generate unique order ID

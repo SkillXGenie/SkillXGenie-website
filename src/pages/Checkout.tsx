@@ -139,7 +139,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
     script.onload = () => {
       const cashfree = (window as any).Cashfree({
-        mode: 'sandbox' // Using sandbox for testing
+        mode: 'sandbox' // Using sandbox for testing - change to 'production' when ready
       });
 
       const checkoutOptions = {
