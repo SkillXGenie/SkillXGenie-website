@@ -37,8 +37,8 @@ serve(async (req: Request) => {
     console.log('Order request data:', { order_amount, order_currency, customer_details: { ...customer_details, customer_phone: customer_details.customer_phone ? 'PROVIDED' : 'MISSING' } });
 
     // Get Cashfree credentials from Supabase secrets
-    const CASHFREE_APP_ID = Deno.env.get("CASHFREE_APP_ID") || Deno.env.get("CASHFREE_ENVIRONMENT_APPID")
-    const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_SECRET_KEY") || Deno.env.get("CASHFREE_ENVIRONMENT_SECRET_KEY")
+    const CASHFREE_APP_ID = Deno.env.get("CASHFREE_ENVIRONMENT_APPID")
+    const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_ENVIRONMENT_SECRET_KEY")
     const CASHFREE_ENVIRONMENT = "sandbox" // Using sandbox for testing
 
     console.log('Environment check:', {
