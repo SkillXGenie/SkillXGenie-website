@@ -117,7 +117,108 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     try {
       console.log('Creating Cashfree order...');
       
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-cashfree-order`, {
+      // Try the edge function first, fallback to direct API call if needed
+      let response;
+      try {
+        response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-cashfree-order`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            order_amount: total,
+            order_currency: 'INR',
+            customer_details: {
+              customer_id: user.id,
+              customer_name: billingDetails.name,
+              customer_email: billingDetails.email,
+              customer_phone: billingDetails.phone
+            },
+            order_meta: {
+              return_url: `${window.location.origin}/payment-success`,
+              notify_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cashfree-webhook`
+            }
+          })
+        });
+      } catch (edgeFunctionError) {
+        console.warn('Edge function failed, trying direct API call:', edgeFunctionError);
+        
+        // Fallback: Direct API call to Cashfree
+        const order_id = `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        response = await fetch('https://sandbox.cashfree.com/pg/orders', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-client-id': import.meta.env.VITE_CASHFREE_APP_ID,
+            'x-client-secret': import.meta.env.VITE_CASHFREE_SECRET_KEY || 'cfsk_ma_test_109178405a18187e2ca902bb2d44871901_ec5f3999',
+            'x-api-version': '2023-08-01'
+          },
+          body: JSON.stringify({
+            order_id,
+            order_amount: total,
+            order_currency: 'INR',
+            customer_details: {
+              customer_id: user.id,
+              customer_name: billingDetails.name,
+              customer_email: billingDetails.email,
+              customer_phone: billingDetails.phone
+            },
+            order_meta: {
+              return_url: `${window.location.origin}/payment-success`
+            }
+          })
+        });
+        
+        const directResult = await response.json();
+        return directResult;
+      }
+
+      const result = await response.json();
+      console.log('Cashfree order response:', result);
+      
+      if (!result.success && !result.order_id) {
+        throw new Error(result.error || 'Failed to create Cashfree order');
+      }
+
+      return result.success ? result.data : result;
+    } catch (error) {
+      console.error('Error creating Cashfree order:', error);
+      throw error;
+    }
+  };
+
+  const initiateCashfreePayment = async (cashfreeOrderData: any) => {
+    try {
+      console.log('Initiating Cashfree payment with data:', cashfreeOrderData);
+
+      // Check for different possible payment URL fields
+      const paymentUrl = cashfreeOrderData.payment_link || 
+                        cashfreeOrderData.checkout_url ||
+                        cashfreeOrderData.payment_url;
+      
+      const paymentSessionId = cashfreeOrderData.payment_session_id || 
+                              cashfreeOrderData.order_token;
+      
+      if (paymentUrl && paymentUrl.startsWith('http')) {
+        console.log('Redirecting to payment URL:', paymentUrl);
+        window.open(paymentUrl, '_self');
+      } else if (paymentSessionId && typeof paymentSessionId === 'string') {
+        // Clean the session ID to remove any extra text
+        const cleanSessionId = paymentSessionId.includes('payment') 
+          ? paymentSessionId.split('payment')[0] 
+          : paymentSessionId;
+        
+        const checkoutUrl = `https://sandbox.cashfree.com/pg/web/checkout?order_token=${cleanSessionId}`;
+        console.log('Constructed checkout URL:', checkoutUrl);
+        window.open(checkoutUrl, '_self');
+      } else {
+        console.error('Available fields in Cashfree response:', Object.keys(cashfreeOrderData));
+        throw new Error(`No valid payment URL or session ID found. Available fields: ${Object.keys(cashfreeOrderData).join(', ')}`);
+      }
+      
+    } catch (error) {
+      console.error('Payment initiation error details:', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
