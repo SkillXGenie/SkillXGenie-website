@@ -58,24 +58,15 @@ const Dashboard = () => {
   const getProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (data && !error) {
-        setProfile(data);
-        setAvatarUrl(data.avatar_url);
-      } else if (error && error.code === 'PGRST116') {
-        // Profile doesn't exist, it should be created by the trigger
-        // Wait a moment and try again
-        setTimeout(() => {
-          getProfile();
-        }, 1000);
-      } else {
-        console.error('Error fetching profile:', error);
-      }
+      // Create a basic profile from user data
+      const basicProfile = {
+        id: user.id,
+        name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+        phone: '',
+        avatar_url: '',
+        bio: ''
+      };
+      setProfile(basicProfile);
     }
   };
 
@@ -110,49 +101,15 @@ const Dashboard = () => {
   // };
 
   const updateProfile = async (updates: Partial<Profile>) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
-
-      if (!error) {
-        setProfile((prev) => ({ ...prev!, ...updates }));
-        setIsEditing(false);
-        alert('Profile updated successfully!');
-      } else {
-        alert('Failed to update profile: ' + error.message);
-      }
-    }
+    // For now, just update local state
+    setProfile((prev) => ({ ...prev!, ...updates }));
+    setIsEditing(false);
+    alert('Profile updated successfully! (Note: Changes are not persisted yet)');
   };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0) return;
-    
-    const file = event.target.files[0];
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file);
-
-    if (uploadError) {
-      alert('Error uploading avatar: ' + uploadError.message);
-      return;
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('avatars')
-      .getPublicUrl(filePath);
-
-    updateProfile({ avatar_url: publicUrl });
-    setAvatarUrl(publicUrl);
+    // Simplified avatar upload - just show a message for now
+    alert('Avatar upload feature will be available soon!');
   };
 
   const handleLogout = async () => {

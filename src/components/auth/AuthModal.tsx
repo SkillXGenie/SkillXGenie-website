@@ -97,20 +97,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            name: name,
-          },
-        },
       });
 
       if (error) {
         console.error('Registration error:', error);
-        if (error.message.includes('Database error')) {
-          alert('Registration failed: Please try again. If the problem persists, contact support.');
-        } else {
-          alert('Registration failed: ' + error.message);
-        }
+        alert('Registration failed: ' + error.message);
       } else {
         alert('Registration successful! Please check your email for a verification link.');
         setIsLogin(true);

@@ -59,15 +59,12 @@ const Navbar = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       setUser(user);
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      if (profile) {
-        setProfile(profile);
-      }
+      // Create basic profile from user metadata
+      const basicProfile = {
+        name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+        avatar_url: ''
+      };
+      setProfile(basicProfile);
     }
   };
 
