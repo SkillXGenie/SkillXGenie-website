@@ -165,7 +165,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       // 4. Update order status to 'completed'
       
       // For demo purposes, we'll simulate a successful payment
-      setTimeout(() => {
+      setTimeout(async () => {
         // Update order status to completed
         try {
           await supabase
