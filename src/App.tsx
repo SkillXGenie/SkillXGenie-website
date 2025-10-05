@@ -12,6 +12,7 @@ import NewsletterPopup from './components/popups/NewsletterPopup';
 import MContact from './pages/MContact';
 import Dashboard from './pages/Dashboard';
 import Checkout from './pages/Checkout';
+import PaymentSuccess from './pages/PaymentSuccess';
 
 // Resource Pages
 import Blog from './pages/resources/Blog';
@@ -51,6 +52,7 @@ function App() {
             <Route path="/MContact" element={<MContact />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/checkout" element={<Checkout />} />
+            <Route path="/payment-success" element={<PaymentSuccess />} />
             
             {/* Resource Routes */}
             <Route path="/blog" element={<Blog />} />

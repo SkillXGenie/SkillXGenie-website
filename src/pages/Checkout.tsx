@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { supabase } from '../lib/supabaseClient';
 import { 
   ArrowLeft, 
@@ -16,9 +14,6 @@ import {
   Phone,
   MapPin
 } from 'lucide-react';
-
-// Initialize Stripe (replace with your publishable key)
-const stripePromise = loadStripe('pk_test_51234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz12');
 
 interface CartItem {
   courseId: string;
@@ -47,8 +42,6 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   user, 
   onSuccess 
 }) => {
-  const stripe = useStripe();
-  const elements = useElements();
   const [processing, setProcessing] = useState(false);
   const [billingDetails, setBillingDetails] = useState({
     name: user?.user_metadata?.name || '',
@@ -103,21 +96,78 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     }
   };
 
+  const createCashfreeOrder = async (orderData: any) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-cashfree-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          order_amount: total,
+          order_currency: 'INR',
+          customer_details: {
+            customer_id: user.id,
+            customer_name: billingDetails.name,
+            customer_email: billingDetails.email,
+            customer_phone: billingDetails.phone
+          },
+          order_meta: {
+            return_url: `${window.location.origin}/payment-success`,
+            notify_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cashfree-webhook`
+          }
+        })
+      });
+
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create Cashfree order');
+      }
+
+      return result.data;
+    } catch (error) {
+      console.error('Error creating Cashfree order:', error);
+      throw error;
+    }
+  };
+
+  const initiateCashfreePayment = (cashfreeOrderData: any) => {
+    // Load Cashfree SDK dynamically
+    const script = document.createElement('script');
+    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+    script.onload = () => {
+      const cashfree = (window as any).Cashfree({
+        mode: import.meta.env.VITE_CASHFREE_ENVIRONMENT || 'sandbox'
+      });
+
+      const checkoutOptions = {
+        paymentSessionId: cashfreeOrderData.payment_session_id,
+        returnUrl: `${window.location.origin}/payment-success`
+      };
+
+      cashfree.checkout(checkoutOptions).then((result: any) => {
+        if (result.error) {
+          console.error('Payment failed:', result.error);
+          alert('Payment failed: ' + result.error.message);
+          setProcessing(false);
+        }
+        // Success will be handled by the return URL
+      });
+    };
+    document.head.appendChild(script);
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (!stripe || !elements) {
+    if (!billingDetails.name || !billingDetails.email || !billingDetails.phone) {
+      alert('Please fill in all required fields');
       return;
     }
 
     setProcessing(true);
-
-    const cardElement = elements.getElement(CardElement);
-
-    if (!cardElement) {
-      setProcessing(false);
-      return;
-    }
 
     try {
       // First, save order to database
@@ -144,67 +194,23 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       const savedOrder = await saveOrderToDatabase(orderData);
       console.log('Order saved:', savedOrder);
 
-      // Create payment method
-      const { error: paymentMethodError, paymentMethod } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: cardElement,
-        billing_details: billingDetails,
-      });
+      // Create Cashfree order
+      const cashfreeOrderData = await createCashfreeOrder(orderData);
+      console.log('Cashfree order created:', cashfreeOrderData);
 
-      if (paymentMethodError) {
-        console.error('Payment method error:', paymentMethodError);
-        alert('Payment failed: ' + paymentMethodError.message);
-        setProcessing(false);
-        return;
-      }
+      // Update order with Cashfree order ID
+      await supabase
+        .from('orders')
+        .update({ 
+          payment_intent_id: cashfreeOrderData.order_id
+        })
+        .eq('id', savedOrder.id);
 
-      // In a real implementation, you would:
-      // 1. Send payment details to your backend
-      // 2. Create a payment intent on your server
-      // 3. Confirm the payment
-      // 4. Update order status to 'completed'
-      
-      // For demo purposes, we'll simulate a successful payment
-      setTimeout(async () => {
-        // Update order status to completed
-        try {
-          await supabase
-            .from('orders')
-            .update({ 
-              payment_status: 'completed',
-              payment_intent_id: 'demo_payment_' + Date.now()
-            })
-            .eq('id', savedOrder.id);
-          
-          alert(`Payment successful! Order #${orderNumber} (Demo mode)`);
-        } catch (error) {
-          console.error('Error updating order status:', error);
-          alert('Payment successful but failed to update order status');
-        }
-        
-        // Clear cart
-        localStorage.removeItem('courseCart');
-        
-        // Call success callback
-        onSuccess();
-        
-        setProcessing(false);
-      }, 2000);
+      // Initiate Cashfree payment
+      initiateCashfreePayment(cashfreeOrderData);
 
     } catch (error) {
       console.error('Payment error:', error);
-      
-      // Update order status to failed if order was created
-      try {
-        const orderNumber = generateOrderNumber();
-        await supabase
-          .from('orders')
-          .update({ payment_status: 'failed' })
-          .eq('order_number', orderNumber);
-      } catch (dbError) {
-        console.error('Error updating failed order status:', dbError);
-      }
-      
       alert('Payment failed. Please try again.');
       setProcessing(false);
     }
@@ -310,40 +316,6 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         </div>
       </div>
 
-      {/* Payment Details */}
-      <div className="bg-white rounded-xl p-6 shadow-lg">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
-          <CreditCard className="h-5 w-5 mr-2" />
-          Payment Information
-        </h3>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Card Details *
-          </label>
-          <div className="border border-gray-300 rounded-lg p-4">
-            <CardElement
-              options={{
-                style: {
-                  base: {
-                    fontSize: '16px',
-                    color: '#424770',
-                    '::placeholder': {
-                      color: '#aab7c4',
-                    },
-                  },
-                },
-              }}
-            />
-          </div>
-        </div>
-        
-        <div className="flex items-center text-sm text-gray-600">
-          <Shield className="h-4 w-4 mr-2" />
-          <span>Your payment information is secure and encrypted</span>
-        </div>
-      </div>
-
       {/* Order Summary */}
       <div className="bg-white rounded-xl p-6 shadow-lg">
         <h3 className="text-lg font-semibold mb-4">Order Summary</h3>
@@ -399,7 +371,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={!stripe || processing}
+        disabled={processing}
         className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 px-6 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
       >
         {processing ? (
@@ -410,7 +382,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         ) : (
           <div className="flex items-center justify-center">
             <Lock className="h-5 w-5 mr-2" />
-            Pay ₹{total.toLocaleString()}
+            Pay ₹{total.toLocaleString()} with Cashfree
           </div>
         )}
       </button>
@@ -418,7 +390,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       <div className="text-center text-sm text-gray-600">
         <div className="flex items-center justify-center mb-2">
           <Shield className="h-4 w-4 mr-1" />
-          <span>Secured by Stripe</span>
+          <span>Secured by Cashfree</span>
         </div>
         <p>Your payment is protected by industry-standard encryption</p>
       </div>
@@ -537,13 +509,11 @@ const Checkout = () => {
         </div>
 
         {/* Checkout Form */}
-        <Elements stripe={stripePromise}>
-          <CheckoutForm 
-            cartItems={cartItems} 
-            user={user} 
-            onSuccess={handlePaymentSuccess}
-          />
-        </Elements>
+        <CheckoutForm 
+          cartItems={cartItems} 
+          user={user} 
+          onSuccess={handlePaymentSuccess}
+        />
 
         {/* Trust Indicators */}
         <div className="mt-8 grid grid-cols-3 gap-4 text-center">
@@ -559,8 +529,8 @@ const Checkout = () => {
           </div>
           <div className="flex flex-col items-center">
             <CreditCard className="h-8 w-8 text-green-500 mb-2" />
-            <span className="text-sm font-medium">All Cards Accepted</span>
-            <span className="text-xs text-gray-600">Visa, Mastercard, etc.</span>
+            <span className="text-sm font-medium">All Payment Methods</span>
+            <span className="text-xs text-gray-600">Cards, UPI, Wallets</span>
           </div>
         </div>
       </div>
