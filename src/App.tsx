@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Hero from './components/Hero';
 import Courses from './pages/Courses';
+import CourseDetail from './pages/CourseDetail';
 import Mentorship from './pages/Mentorship';
 import About from './pages/About';
 import Contact from './pages/Contact';
@@ -42,6 +43,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Hero />} />
             <Route path="/courses" element={<Courses />} />
+            <Route path="/course/:courseId" element={<CourseDetail />} />
             <Route path="/mentorship" element={<Mentorship />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />

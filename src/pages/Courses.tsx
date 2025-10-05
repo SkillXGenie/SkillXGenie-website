@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Briefcase, MessageCircle, Bot, Code, Coffee, FileCode, ChevronDown, ChevronUp, Clock, IndianRupee } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { Briefcase, MessageCircle, Bot, Code, Coffee, FileCode, Clock, IndianRupee, ShoppingCart, Users, Star } from 'lucide-react';
 
 interface Course {
   id: string;
@@ -15,6 +16,10 @@ interface Course {
   shortTermFocus: string;
   longTermFocus: string;
   emoji: string;
+  rating: number;
+  students: number;
+  totalHours: string;
+  lectures: number;
 }
 
 const courses: Course[] = [
@@ -30,7 +35,11 @@ const courses: Course[] = [
     category: "Business & Management",
     shortTermFocus: "Quick practical lessons and project-based learning.",
     longTermFocus: "In-depth understanding of business models, case studies, and personal mentorship.",
-    emoji: "💼"
+    emoji: "💼",
+    rating: 4.8,
+    students: 1250,
+    totalHours: "4h 20m",
+    lectures: 24
   },
   {
     id: "spoken-english",
@@ -44,7 +53,11 @@ const courses: Course[] = [
     category: "Language & Communication",
     shortTermFocus: "Communication basics, accent training, and daily conversations.",
     longTermFocus: "Advanced speaking, presentation skills, interview preparation, and fluency refinement.",
-    emoji: "🗣️"
+    emoji: "🗣️",
+    rating: 4.7,
+    students: 2100,
+    totalHours: "4h",
+    lectures: 28
   },
   {
     id: "robotics-fundamentals",
@@ -58,7 +71,11 @@ const courses: Course[] = [
     category: "Robotics & Engineering",
     shortTermFocus: "Basic robotics concepts and small project building.",
     longTermFocus: "Advanced projects, automation systems, and AI integration in robotics.",
-    emoji: "🤖"
+    emoji: "🤖",
+    rating: 4.9,
+    students: 890,
+    totalHours: "4h 30m",
+    lectures: 25
   },
   {
     id: "c-programming",
@@ -72,7 +89,11 @@ const courses: Course[] = [
     category: "Programming",
     shortTermFocus: "Core syntax and practical exercises.",
     longTermFocus: "Data structures, algorithms, and mini-projects.",
-    emoji: "💻"
+    emoji: "💻",
+    rating: 4.6,
+    students: 1800,
+    totalHours: "3h 45m",
+    lectures: 22
   },
   {
     id: "cpp-programming",
@@ -86,7 +107,11 @@ const courses: Course[] = [
     category: "Programming",
     shortTermFocus: "Basics of OOP and syntax.",
     longTermFocus: "Advanced concepts and project development.",
-    emoji: "💡"
+    emoji: "💡",
+    rating: 4.7,
+    students: 1450,
+    totalHours: "4h",
+    lectures: 25
   },
   {
     id: "java-programming",
@@ -100,7 +125,11 @@ const courses: Course[] = [
     category: "Programming",
     shortTermFocus: "Java basics and console programs.",
     longTermFocus: "GUI, APIs, and mini-projects like login systems or apps.",
-    emoji: "☕"
+    emoji: "☕",
+    rating: 4.8,
+    students: 1650,
+    totalHours: "4h 20m",
+    lectures: 26
   },
   {
     id: "python-programming",
@@ -114,7 +143,11 @@ const courses: Course[] = [
     category: "Programming",
     shortTermFocus: "Core Python syntax, loops, and data handling.",
     longTermFocus: "Advanced topics including OOP, libraries (NumPy, Pandas), and AI/ML basics.",
-    emoji: "🐍"
+    emoji: "🐍",
+    rating: 4.9,
+    students: 2300,
+    totalHours: "4h 30m",
+    lectures: 28
   }
 ];
 
@@ -127,15 +160,25 @@ const categories = [
 ];
 
 const Courses = () => {
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [expandedCourse, setExpandedCourse] = useState<string | null>(null);
+  const [hoveredCourse, setHoveredCourse] = useState<string | null>(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   const filteredCourses = selectedCategory === "All" 
     ? courses 
     : courses.filter(course => course.category === selectedCategory);
 
+  const handleMouseMove = (e: React.MouseEvent) => {
+    setMousePosition({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleCourseClick = (courseId: string) => {
+    navigate(`/course/${courseId}`);
+  };
+
   return (
-    <div className="pt-16 min-h-screen bg-gray-50">
+    <div className="pt-16 min-h-screen bg-gray-50" onMouseMove={handleMouseMove}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -173,7 +216,10 @@ const Courses = () => {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group"
+              className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer"
+              onMouseEnter={() => setHoveredCourse(course.id)}
+              onMouseLeave={() => setHoveredCourse(null)}
+              onClick={() => handleCourseClick(course.id)}
             >
               <div className="p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -187,15 +233,26 @@ const Courses = () => {
                   <span className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
                     {course.category}
                   </span>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center">
+                      <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                      <span className="text-sm font-medium ml-1">{course.rating}</span>
+                    </div>
+                    <div className="flex items-center text-gray-500">
+                      <Users className="h-4 w-4" />
+                      <span className="text-sm ml-1">{course.students}</span>
+                    </div>
+                  </div>
                 </div>
                 
                 <h3 className="text-xl font-semibold mb-3 text-gray-900 group-hover:text-blue-600 transition-colors duration-300">
                   {course.title}
                 </h3>
                 
-                <p className="text-gray-600 mb-4 line-clamp-3">
-                  {course.description}
-                </p>
+                <div className="flex items-center text-gray-500 mb-4">
+                  <Clock className="h-4 w-4 mr-2" />
+                  <span className="text-sm">{course.totalHours} • {course.lectures} lectures</span>
+                </div>
                 
                 <div className="space-y-4">
                   <div className="bg-gray-50 p-4 rounded-lg">
@@ -227,63 +284,64 @@ const Courses = () => {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setExpandedCourse(expandedCourse === course.id ? null : course.id)}
-                  className="w-full mt-6 flex items-center justify-center text-blue-600 hover:text-blue-700 font-medium transition-colors duration-300"
-                >
-                  {expandedCourse === course.id ? (
-                    <>
-                      Show Less <ChevronUp className="h-4 w-4 ml-1" />
-                    </>
-                  ) : (
-                    <>
-                      Learn More <ChevronDown className="h-4 w-4 ml-1" />
-                    </>
-                  )}
-                </button>
-
-                {expandedCourse === course.id && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="mt-6 space-y-4 border-t pt-4"
-                  >
-                    <div className="bg-green-50 p-4 rounded-lg">
-                      <h4 className="font-semibold text-green-800 mb-2 flex items-center">
-                        <Clock className="h-4 w-4 mr-2" />
-                        Short-Term Focus ({course.shortTermDuration})
-                      </h4>
-                      <p className="text-green-700 text-sm">{course.shortTermFocus}</p>
-                    </div>
-                    
-                    <div className="bg-blue-50 p-4 rounded-lg">
-                      <h4 className="font-semibold text-blue-800 mb-2 flex items-center">
-                        <Clock className="h-4 w-4 mr-2" />
-                        Long-Term Focus ({course.longTermDuration})
-                      </h4>
-                      <p className="text-blue-700 text-sm">{course.longTermFocus}</p>
-                    </div>
-
-                    <div className="flex gap-3 pt-4">
-                      <button className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-4 px-6 rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 flex flex-col items-center space-y-1">
-                        <span className="text-sm font-medium">Quick Start</span>
-                        <span className="text-lg font-bold">₹299</span>
-                        <span className="text-xs opacity-90">30 Days</span>
-                      </button>
-                      <button className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 px-6 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 flex flex-col items-center space-y-1">
-                        <span className="text-sm font-medium">Complete Course</span>
-                        <span className="text-lg font-bold">₹2,999</span>
-                        <span className="text-xs opacity-90">3-4 Months</span>
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
+                <div className="mt-6 text-center">
+                  <button className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-6 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105">
+                    View Course Details
+                  </button>
+                </div>
               </div>
             </motion.div>
           ))}
         </div>
+
+        {/* Hover Description Popup */}
+        <AnimatePresence>
+          {hoveredCourse && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.2 }}
+              className="fixed z-50 bg-white p-6 rounded-xl shadow-2xl border max-w-md"
+              style={{
+                left: mousePosition.x + 20,
+                top: mousePosition.y - 100,
+                pointerEvents: 'none'
+              }}
+            >
+              {(() => {
+                const course = courses.find(c => c.id === hoveredCourse);
+                if (!course) return null;
+                
+                return (
+                  <div>
+                    <div className="flex items-center mb-3">
+                      <span className="text-2xl mr-3">{course.emoji}</span>
+                      <h3 className="font-semibold text-lg">{course.title}</h3>
+                    </div>
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-4">
+                      {course.description}
+                    </p>
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center">
+                        <Star className="h-4 w-4 text-yellow-400 fill-current mr-1" />
+                        <span>{course.rating}</span>
+                      </div>
+                      <div className="flex items-center">
+                        <Users className="h-4 w-4 text-gray-500 mr-1" />
+                        <span>{course.students} students</span>
+                      </div>
+                      <div className="flex items-center">
+                        <Clock className="h-4 w-4 text-gray-500 mr-1" />
+                        <span>{course.totalHours}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {filteredCourses.length === 0 && (
           <motion.div

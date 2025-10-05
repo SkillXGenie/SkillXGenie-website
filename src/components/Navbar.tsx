@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Menu, X, LogIn } from 'lucide-react';
+import { Menu, X, LogIn, ShoppingCart } from 'lucide-react';
 import AuthModal from './auth/AuthModal';
+import Cart from './Cart';
 import { supabase } from '../lib/supabaseClient';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [cartItemCount, setCartItemCount] = useState(0);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const location = useLocation();
@@ -15,6 +18,7 @@ const Navbar = () => {
 
   useEffect(() => {
     getUser();
+    updateCartCount();
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN') {
         getUser();
@@ -23,6 +27,19 @@ const Navbar = () => {
         setProfile(null);
       }
     });
+  }, []);
+
+  const updateCartCount = () => {
+    const savedCart = localStorage.getItem('courseCart');
+    if (savedCart) {
+      const cart = JSON.parse(savedCart);
+      setCartItemCount(cart.length);
+    }
+  };
+
+  useEffect(() => {
+    const interval = setInterval(updateCartCount, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const getUser = async () => {
@@ -77,6 +94,17 @@ const Navbar = () => {
               <Link to="/contact" className={`${isActive('/contact')} transition-colors`}>
                 Contact
               </Link>
+              <button
+                onClick={() => setIsCartOpen(true)}
+                className="relative text-gray-700 hover:text-blue-600 transition-colors"
+              >
+                <ShoppingCart className="h-6 w-6" />
+                {cartItemCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {cartItemCount}
+                  </span>
+                )}
+              </button>
               {user ? (
                 <div 
                   className="cursor-pointer"
@@ -99,6 +127,17 @@ const Navbar = () => {
             </div>
 
             <div className="md:hidden flex items-center space-x-4">
+              <button
+                onClick={() => setIsCartOpen(true)}
+                className="relative text-gray-700 hover:text-blue-600 transition-colors"
+              >
+                <ShoppingCart className="h-5 w-5" />
+                {cartItemCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                    {cartItemCount}
+                  </span>
+                )}
+              </button>
               {user ? (
                 <div 
                   className="cursor-pointer"
@@ -172,6 +211,10 @@ const Navbar = () => {
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+      />
+      <Cart
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
       />
     </>
   );
