@@ -91,14 +91,17 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   const handleRegister = async (data: RegisterFormData) => {
     setLoading(true);
-    const { email, password } = data;
+    const { name, email, password } = data;
 
     try {
-      // Simple registration without any metadata or database calls
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          data: {
+            name: name,
+            full_name: name
+          },
           emailRedirectTo: `${window.location.origin}/dashboard`
         }
       });
