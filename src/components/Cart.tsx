@@ -71,7 +71,9 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
 
   const getTotalPrice = () => {
     return cartItems.reduce((total, item) => {
-      const price = parseInt(item.price.replace('₹', ''));
+      // Handle both ₹299 and ₹2,999 formats
+      const priceString = item.price.replace('₹', '').replace(',', '');
+      const price = parseInt(priceString);
       return total + price;
     }, 0);
   };

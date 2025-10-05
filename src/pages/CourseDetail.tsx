@@ -547,15 +547,21 @@ const CourseDetail = () => {
   const addToCart = (plan: 'short' | 'long') => {
     if (!course) return;
     
-    const price = plan === 'short' ? course.shortTermPrice : course.longTermPrice;
+    const priceString = plan === 'short' ? course.shortTermPrice : course.longTermPrice;
     const newItem = { courseId: course.id, plan, price };
     
     // Check if item already exists
-    const existingIndex = cart.findIndex(item => item.courseId === course.id && item.plan === plan);
+    const savedCart = localStorage.getItem('courseCart');
+    const currentCart = savedCart ? JSON.parse(savedCart) : [];
+    const existingIndex = currentCart.findIndex(item => item.courseId === course.id && item.plan === plan);
+    
     if (existingIndex === -1) {
-      const newCart = [...cart, newItem];
-      saveCart(newCart);
+      const newCart = [...currentCart, { courseId: course.id, plan, price: priceString }];
+      localStorage.setItem('courseCart', JSON.stringify(newCart));
+      setCart(newCart);
       alert('Course added to cart!');
+      // Trigger storage event for other components
+      window.dispatchEvent(new Event('storage'));
     } else {
       alert('Course already in cart!');
     }
