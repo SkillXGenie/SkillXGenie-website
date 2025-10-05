@@ -88,12 +88,15 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
     try {
       const { data: { user }, error } = await supabase.auth.getUser();
       if (error) {
-        console.error('Error getting user:', error);
+        console.error('Error getting user:', error.message);
+        // Don't throw error, just set user to null
+        setUser(null);
         return;
       }
       setUser(user);
     } catch (error) {
-      console.error('Error getting user:', error);
+      console.error('Network error getting user:', error);
+      setUser(null);
     }
   };
 

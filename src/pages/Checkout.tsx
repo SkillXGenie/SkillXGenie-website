@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 // Initialize Stripe (replace with your publishable key)
-const stripePromise = loadStripe('pk_test_your_stripe_publishable_key_here');
+const stripePromise = loadStripe('pk_test_51234567890abcdefghijklmnopqrstuvwxyz1234567890abcdefghijklmnopqrstuvwxyz12');
 
 interface CartItem {
   courseId: string;
