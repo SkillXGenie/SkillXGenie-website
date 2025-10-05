@@ -267,11 +267,15 @@ const Courses = () => {
                     </div>
 
                     <div className="flex gap-3 pt-4">
-                      <button className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-medium">
-                        Enroll Short-Term
+                      <button className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-4 px-6 rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 flex flex-col items-center space-y-1">
+                        <span className="text-sm font-medium">Quick Start</span>
+                        <span className="text-lg font-bold">₹299</span>
+                        <span className="text-xs opacity-90">30 Days</span>
                       </button>
-                      <button className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                        Enroll Long-Term
+                      <button className="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 px-6 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 flex flex-col items-center space-y-1">
+                        <span className="text-sm font-medium">Complete Course</span>
+                        <span className="text-lg font-bold">₹2,999</span>
+                        <span className="text-xs opacity-90">3-4 Months</span>
                       </button>
                     </div>
                   </motion.div>
