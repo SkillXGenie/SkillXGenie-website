@@ -140,8 +140,8 @@ const CookiePolicy = () => {
               <h2 className="text-2xl font-bold mb-4">7. Contact Us</h2>
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-gray-600">If you have questions about our Cookie Policy, contact us at:</p>
-                <p className="text-gray-600">Email: privacy@skillxgenie.com</p>
-                <p className="text-gray-600">Phone: +1 (555) 123-4567</p>
+                <p className="text-gray-600">Email: skillxgenie@gmail.com</p>
+                <p className="text-gray-600">Phone: +91 8008615692</p>
               </div>
             </section>
           </div>

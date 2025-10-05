@@ -126,7 +126,7 @@ const HelpCenter = () => {
           >
             <Phone className="h-8 w-8 text-blue-600 mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">Phone Support</h3>
-            <p className="text-gray-600">Call us at +1 (555) 123-4567</p>
+            <p className="text-gray-600">Call us at +91 8008615692</p>
             <p className="mt-4 text-sm text-gray-500">Mon-Fri, 9am-5pm EST</p>
           </motion.div>
 
@@ -138,7 +138,7 @@ const HelpCenter = () => {
           >
             <Mail className="h-8 w-8 text-blue-600 mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">Email Support</h3>
-            <p className="text-gray-600">support@skillxgenie.com</p>
+            <p className="text-gray-600">skillxgenie@gmail.com</p>
             <p className="mt-4 text-sm text-gray-500">24/7 Response</p>
           </motion.div>
         </div>

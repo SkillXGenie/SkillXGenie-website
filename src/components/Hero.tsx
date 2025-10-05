@@ -103,8 +103,21 @@ const Hero = () => {
               {/* Learn by Doing Card */}
               <motion.div 
                 initial={{ opacity: 0, y: 20, rotateX: 15 }}
-                animate={{ opacity: 1, y: 0, rotateX: 0 }}
-                transition={{ duration: 0.8, delay: 0.5 }}
+                animate={{ 
+                  opacity: 1, 
+                  y: [0, -8, 0], 
+                  rotateX: 0 
+                }}
+                transition={{ 
+                  opacity: { duration: 0.8, delay: 0.5 },
+                  rotateX: { duration: 0.8, delay: 0.5 },
+                  y: { 
+                    duration: 2.5, 
+                    repeat: Infinity, 
+                    ease: "easeInOut",
+                    delay: 0.5
+                  }
+                }}
                 whileHover={{ 
                   y: -10, 
                   rotateX: 5, 
@@ -133,8 +146,21 @@ const Hero = () => {
               {/* Expert Mentors Card */}
               <motion.div 
                 initial={{ opacity: 0, y: -20, rotateX: -15 }}
-                animate={{ opacity: 1, y: 0, rotateX: 0 }}
-                transition={{ duration: 0.8, delay: 0.7 }}
+                animate={{ 
+                  opacity: 1, 
+                  y: [0, -6, 0], 
+                  rotateX: 0 
+                }}
+                transition={{ 
+                  opacity: { duration: 0.8, delay: 0.7 },
+                  rotateX: { duration: 0.8, delay: 0.7 },
+                  y: { 
+                    duration: 3, 
+                    repeat: Infinity, 
+                    ease: "easeInOut",
+                    delay: 0.7
+                  }
+                }}
                 whileHover={{ 
                   y: -10, 
                   rotateX: -5, 
@@ -163,8 +189,23 @@ const Hero = () => {
               {/* Industry Leaders Card */}
               <motion.div 
                 initial={{ opacity: 0, x: 30, rotateY: 15 }}
-                animate={{ opacity: 1, x: 0, rotateY: 0 }}
-                transition={{ duration: 0.8, delay: 0.9 }}
+                animate={{ 
+                  opacity: 1, 
+                  x: 0, 
+                  y: [0, -5, 0],
+                  rotateY: 0 
+                }}
+                transition={{ 
+                  opacity: { duration: 0.8, delay: 0.9 },
+                  x: { duration: 0.8, delay: 0.9 },
+                  rotateY: { duration: 0.8, delay: 0.9 },
+                  y: { 
+                    duration: 2.8, 
+                    repeat: Infinity, 
+                    ease: "easeInOut",
+                    delay: 0.9
+                  }
+                }}
                 whileHover={{ 
                   x: 10, 
                   rotateY: 10, 
@@ -276,7 +317,11 @@ const Hero = () => {
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {[1, 2, 3].map((_, index) => (
+            {[
+              { name: "David", testimonial: "The hands-on learning approach at Skill X Genie transformed my understanding of robotics. The mentors are incredibly supportive and knowledgeable." },
+              { name: "Manoj", testimonial: "Skill X Genie's programming courses gave me the confidence to pursue a career in software development. The practical projects were invaluable." },
+              { name: "Surya", testimonial: "The business essentials course helped me launch my startup successfully. The mentorship program provided excellent guidance throughout my journey." }
+            ].map((student, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 20 }}
@@ -285,19 +330,16 @@ const Hero = () => {
                 className="bg-white p-8 rounded-xl shadow-md"
               >
                 <div className="flex items-center mb-4">
-                  <img
-                    src={`https://i.pravatar.cc/60?img=${index + 1}`}
-                    alt="Student"
-                    className="w-12 h-12 rounded-full mr-4"
-                  />
+                  <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-lg mr-4">
+                    {student.name.charAt(0)}
+                  </div>
                   <div>
-                    <h4 className="font-semibold">Student Name</h4>
+                    <h4 className="font-semibold">{student.name}</h4>
                     <p className="text-gray-600 text-sm">Course Graduate</p>
                   </div>
                 </div>
                 <p className="text-gray-600 mb-4">
-                  "The hands-on learning approach at Skill X Genie transformed my understanding of robotics. 
-                  The mentors are incredibly supportive and knowledgeable."
+                  "{student.testimonial}"
                 </p>
                 <div className="flex text-yellow-400">
                   {[...Array(5)].map((_, i) => (

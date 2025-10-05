@@ -137,9 +137,9 @@ const TermsOfService = () => {
               <h2 className="text-2xl font-bold mb-4">8. Contact Information</h2>
               <div className="bg-gray-50 p-4 rounded-lg">
                 <p className="text-gray-600">For questions about these Terms of Service, contact us at:</p>
-                <p className="text-gray-600">Email: legal@skillxgenie.com</p>
-                <p className="text-gray-600">Phone: +1 (555) 123-4567</p>
-                <p className="text-gray-600">Address: 123 Legal Avenue, Tech City, TC 12345</p>
+                <p className="text-gray-600">Email: skillxgenie@gmail.com</p>
+                <p className="text-gray-600">Phone: +91 8008615692</p>
+                <p className="text-gray-600">Address: Palamaner, agraharam road, Andhra Pradesh, India</p>
               </div>
             </section>
           </div>

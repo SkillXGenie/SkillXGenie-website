@@ -140,8 +140,8 @@ const Accessibility = () => {
                 <p className="text-gray-600 mb-4">
                   We welcome your feedback on the accessibility of our website. Please let us know if you encounter any accessibility barriers:
                 </p>
-                <p className="text-gray-600">Email: accessibility@skillxgenie.com</p>
-                <p className="text-gray-600">Phone: +1 (555) 123-4567</p>
+                <p className="text-gray-600">Email: skillxgenie@gmail.com</p>
+                <p className="text-gray-600">Phone: +91 8008615692</p>
                 <p className="text-gray-600">
                   We aim to respond to accessibility feedback within 2 business days.
                 </p>

@@ -6,20 +6,20 @@ const contactInfo = [
   {
     icon: <Phone className="h-6 w-6" />,
     title: "Phone",
-    details: "+1 (555) 123-4567",
-    subDetails: "Mon-Fri from 8am to 5pm"
+    details: "+91 8008615692",
+    subDetails: "Mon-Fri from 9am to 6pm"
   },
   {
     icon: <Mail className="h-6 w-6" />,
     title: "Email",
-    details: "info@skillxgenie.com",
+    details: "skillxgenie@gmail.com",
     subDetails: "Online support 24/7"
   },
   {
     icon: <MapPin className="h-6 w-6" />,
     title: "Address",
-    details: "123 Innovation Drive",
-    subDetails: "San Francisco, CA 94105"
+    details: "Palamaner, agraharam road",
+    subDetails: "Andhra Pradesh, India"
   },
   {
     icon: <Clock className="h-6 w-6" />,
