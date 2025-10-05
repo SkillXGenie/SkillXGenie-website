@@ -579,18 +579,22 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={processing || !cashfreeLoaded}
+        disabled={processing || sdkLoading || !cashfreeSDK}
         className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 px-6 rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
       >
         {processing ? (
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-            Creating Payment Order...
+            Processing Payment...
           </div>
-        ) : !cashfreeLoaded ? (
+        ) : sdkLoading ? (
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
             Loading Payment System...
+          </div>
+        ) : !cashfreeSDK ? (
+          <div className="flex items-center justify-center">
+            <span className="text-red-200">Payment System Unavailable</span>
           </div>
         ) : (
           <div className="flex items-center justify-center">
