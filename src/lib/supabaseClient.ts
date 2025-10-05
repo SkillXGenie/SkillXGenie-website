@@ -23,5 +23,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
     flowType: 'pkce'
+  },
+  global: {
+    headers: {
+      'Access-Control-Allow-Origin': '*'
+    }
   }
 });
