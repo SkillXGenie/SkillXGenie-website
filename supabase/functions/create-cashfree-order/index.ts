@@ -37,9 +37,9 @@ serve(async (req: Request) => {
     console.log('Order request data:', { order_amount, order_currency, customer_details: { ...customer_details, customer_phone: customer_details.customer_phone ? 'PROVIDED' : 'MISSING' } });
 
     // Get Cashfree credentials from Supabase secrets
-    const CASHFREE_APP_ID = Deno.env.get("CASHFREE_ENVIRONMENT_APPID")
-    const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_ENVIRONMENT_SECRET_KEY")
-    const CASHFREE_ENVIRONMENT = "sandbox" // Using sandbox for testing
+    const CASHFREE_ENVIRONMENT = "sandbox" // Set to "production" for live environment
+    const CASHFREE_APP_ID = Deno.env.get(`CASHFREE_${CASHFREE_ENVIRONMENT.toUpperCase()}_APP_ID`) || Deno.env.get("CASHFREE_ENVIRONMENT_APPID")
+    const CASHFREE_SECRET_KEY = Deno.env.get(`CASHFREE_${CASHFREE_ENVIRONMENT.toUpperCase()}_SECRET_KEY`) || Deno.env.get("CASHFREE_ENVIRONMENT_SECRET_KEY")
 
     console.log('Environment check:', {
       hasAppId: !!CASHFREE_APP_ID,
@@ -48,7 +48,7 @@ serve(async (req: Request) => {
     });
 
     if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
-      const errorMsg = "Cashfree credentials not configured. Please check CASHFREE_APP_ID/CASHFREE_ENVIRONMENT_APPID and CASHFREE_SECRET_KEY/CASHFREE_ENVIRONMENT_SECRET_KEY in Supabase secrets."
+      const errorMsg = "Cashfree credentials not configured. Please check CASHFREE_SANDBOX_APP_ID/CASHFREE_ENVIRONMENT_APPID and CASHFREE_SANDBOX_SECRET_KEY/CASHFREE_ENVIRONMENT_SECRET_KEY in Supabase secrets."
       console.error(errorMsg);
       throw new Error(errorMsg)
     }
