@@ -19,6 +19,7 @@ const PaymentSuccess = () => {
       // Get payment details from URL parameters
       const orderId = searchParams.get('order_id');
       const orderToken = searchParams.get('order_token');
+      const status = searchParams.get('status');
       
       if (!orderId) {
         console.error('No order ID found in URL');
@@ -26,21 +27,31 @@ const PaymentSuccess = () => {
         return;
       }
 
-      // Update order status to completed
-      const { data: order, error } = await supabase
-        .from('orders')
-        .update({ 
+      // Check if this is a demo payment
+      if (orderId.startsWith('demo_')) {
+        setOrderDetails({
+          order_number: orderId,
+          total_amount: 29900, // Demo amount
           payment_status: 'completed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('order_number', orderId)
-        .select()
-        .single();
+          created_at: new Date().toISOString()
+        });
+      } else if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        // Update order status to completed
+        const { data: order, error } = await supabase
+          .from('orders')
+          .update({ 
+            payment_status: 'completed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('order_number', orderId)
+          .select()
+          .single();
 
-      if (error) {
-        console.error('Error updating order:', error);
-      } else {
-        setOrderDetails(order);
+        if (error) {
+          console.error('Error updating order:', error);
+        } else {
+          setOrderDetails(order);
+        }
       }
 
       // Clear cart
