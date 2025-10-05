@@ -56,17 +56,29 @@ const Dashboard = () => {
   // };
 
   const getProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      // Create a basic profile from user data
-      const basicProfile = {
-        id: user.id,
-        name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
-        phone: '',
-        avatar_url: '',
-        bio: ''
-      };
-      setProfile(basicProfile);
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error('Error getting user:', error);
+        navigate('/');
+        return;
+      }
+      if (user) {
+        // Create a basic profile from user data
+        const basicProfile = {
+          id: user.id,
+          name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+          phone: '',
+          avatar_url: '',
+          bio: ''
+        };
+        setProfile(basicProfile);
+      } else {
+        navigate('/');
+      }
+    } catch (error) {
+      console.error('Error getting user:', error);
+      navigate('/');
     }
   };
 

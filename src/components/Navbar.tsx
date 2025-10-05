@@ -56,15 +56,23 @@ const Navbar = () => {
   }, []);
 
   const getUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      setUser(user);
-      // Create basic profile from user metadata
-      const basicProfile = {
-        name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
-        avatar_url: ''
-      };
-      setProfile(basicProfile);
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error('Error getting user:', error);
+        return;
+      }
+      if (user) {
+        setUser(user);
+        // Create basic profile from user metadata
+        const basicProfile = {
+          name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+          avatar_url: ''
+        };
+        setProfile(basicProfile);
+      }
+    } catch (error) {
+      console.error('Error getting user:', error);
     }
   };
 

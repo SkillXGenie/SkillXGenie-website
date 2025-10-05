@@ -73,6 +73,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       if (error) {
         if (error.message.includes('Email not confirmed')) {
         } else {
+          console.error('Login error:', error);
           alert('Login failed: ' + error.message);
         }
       } else if (authData.user) {
@@ -82,7 +83,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       }
     } catch (error) {
       console.error('Login error:', error);
-      alert('An unexpected error occurred during login.');
+      if (error instanceof Error && error.message.includes('Failed to fetch')) {
+        alert('Connection error: Unable to connect to authentication service. Please check your internet connection and try again.');
+      } else {
+        alert('An unexpected error occurred during login.');
+      }
     } finally {
       setLoading(false);
     }

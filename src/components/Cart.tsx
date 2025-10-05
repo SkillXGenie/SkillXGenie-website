@@ -85,8 +85,16 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
   }, []);
 
   const getUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setUser(user);
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error('Error getting user:', error);
+        return;
+      }
+      setUser(user);
+    } catch (error) {
+      console.error('Error getting user:', error);
+    }
   };
 
   const removeFromCart = (index: number) => {
