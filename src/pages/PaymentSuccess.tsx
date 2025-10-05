@@ -33,7 +33,7 @@ const PaymentSuccess = () => {
           payment_status: 'completed',
           updated_at: new Date().toISOString()
         })
-        .eq('payment_intent_id', orderId)
+        .eq('order_number', orderId)
         .select()
         .single();
 
