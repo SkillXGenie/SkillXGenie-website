@@ -90,6 +90,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   onSuccess 
 }) => {
   const [processing, setProcessing] = useState(false);
+  const [cashfreeLoaded, setCashfreeLoaded] = useState(false);
   const [billingDetails, setBillingDetails] = useState({
     name: user?.user_metadata?.name || '',
     email: user?.email || '',
@@ -102,6 +103,20 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       country: 'IN'
     }
   });
+
+  useEffect(() => {
+    const checkCashfreeSDK = () => {
+      if (window.Cashfree) {
+        setCashfreeLoaded(true);
+        console.log('Cashfree SDK is available');
+      } else {
+        console.log('Waiting for Cashfree SDK to load...');
+        setTimeout(checkCashfreeSDK, 100);
+      }
+    };
+    
+    checkCashfreeSDK();
+  }, []);
 
 
   const calculatePricing = () => {
