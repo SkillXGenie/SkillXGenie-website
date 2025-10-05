@@ -177,7 +177,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
       console.log('Initiating Cashfree payment with data:', cashfreeOrderData);
 
-      const cashfree = window.Cashfree({
+      const cashfree = new window.Cashfree({
         mode: 'sandbox' // Change to 'production' when ready
       });
 
