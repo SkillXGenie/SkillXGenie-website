@@ -192,37 +192,16 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     try {
       console.log('Initiating Cashfree payment with data:', cashfreeOrderData);
 
-      // Check for different possible payment URL fields
-      const paymentUrl = cashfreeOrderData.payment_link || 
-                        cashfreeOrderData.checkout_url ||
-                        cashfreeOrderData.payment_url;
+      // For sandbox environment, use the payment_session_id with correct URL format
+      const paymentSessionId = cashfreeOrderData.payment_session_id;
       
-      const paymentSessionId = cashfreeOrderData.payment_session_id || 
-                              cashfreeOrderData.order_token;
-      
-      if (paymentUrl && paymentUrl.startsWith('http')) {
-        console.log('Redirecting to payment URL:', paymentUrl);
-        window.open(paymentUrl, '_self');
-      } else if (paymentSessionId && typeof paymentSessionId === 'string') {
-        // Clean the session ID to remove any extra text at the end
-        let cleanSessionId = paymentSessionId;
-        
-        // Remove any trailing "payment" text that might be duplicated
-        if (cleanSessionId.endsWith('paymentpayment')) {
-          cleanSessionId = cleanSessionId.replace(/paymentpayment$/, '');
-        } else if (cleanSessionId.endsWith('payment')) {
-          cleanSessionId = cleanSessionId.replace(/payment$/, '');
-        }
-        
-        console.log('Original session ID:', paymentSessionId);
-        console.log('Cleaned session ID:', cleanSessionId);
-        
-        const checkoutUrl = `https://sandbox.cashfree.com/pg/web/checkout?order_token=${cleanSessionId}`;
-        console.log('Constructed checkout URL:', checkoutUrl);
-        window.open(checkoutUrl, '_self');
+      if (paymentSessionId) {
+        // Use the correct Cashfree sandbox checkout URL format
+        const checkoutUrl = `https://sandbox.cashfree.com/pg/checkout/hosted?order_token=${paymentSessionId}`;
+        console.log('Redirecting to Cashfree checkout:', checkoutUrl);
+        window.location.href = checkoutUrl;
       } else {
-        console.error('Available fields in Cashfree response:', Object.keys(cashfreeOrderData));
-        throw new Error(`No valid payment URL or session ID found. Available fields: ${Object.keys(cashfreeOrderData).join(', ')}`);
+        throw new Error('No payment session ID found in Cashfree response');
       }
       
     } catch (error) {
