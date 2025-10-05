@@ -151,11 +151,14 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         },
         order_meta: {
           return_url: `${window.location.origin}/payment-success`,
-          notify_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook`
+          notify_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook`,
+          payment_methods: "cc,dc,nb,upi,paylater,emi,cardlessemi,debitcardemi,paypal,app,wallet"
         }
       };
 
       console.log('Calling Supabase Edge Function...');
+      console.log('Edge Function URL:', `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-cashfree-order`);
+      
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-cashfree-order`, {
         method: 'POST',
         headers: {
@@ -165,9 +168,14 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         body: JSON.stringify(orderData)
       });
 
+      console.log('Edge Function Response Status:', response.status);
+      console.log('Edge Function Response Headers:', Object.fromEntries(response.headers.entries()));
+      
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Edge function error:', errorText);
+        console.error('Response status:', response.status);
+        console.error('Response statusText:', response.statusText);
         throw new Error(`Failed to create payment order: ${errorText}`);
       }
 
