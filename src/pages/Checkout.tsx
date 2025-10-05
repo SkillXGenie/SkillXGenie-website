@@ -72,7 +72,14 @@ const paymentMethods: PaymentMethod[] = [
 // Declare Cashfree global
 declare global {
   interface Window {
-    Cashfree: any;
+    Cashfree: (config: { mode: string }) => {
+      pay: (options: {
+        orderToken: string;
+        onSuccess: (data: any) => void;
+        onFailure: (data: any) => void;
+        onClose: () => void;
+      }) => void;
+    };
   }
 }
 
@@ -159,8 +166,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         },
         order_meta: {
           return_url: `${window.location.origin}/payment-success`,
-          notify_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook`,
-          payment_methods: "cc,dc,ppc,ccc,emi,paypal,upi,nb,app,paylater"
+          notify_url: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook`
         }
       };
 
@@ -288,36 +294,48 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       const cashfreeOrder = await createCashfreeOrder();
       console.log('Cashfree order created:', cashfreeOrder);
 
-      // Update order with Cashfree order details
-      await supabase
-        .from('orders')
-        .update({ 
-          payment_status: 'pending',
-          payment_intent_id: cashfreeOrder.order_id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', savedOrder.id);
+      // Update order with Cashfree order details if database is available
+      if (savedOrder && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        await supabase
+          .from('orders')
+          .update({ 
+            payment_status: 'pending',
+            payment_intent_id: cashfreeOrder.order_id,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', savedOrder.id);
+      }
 
       console.log('Order updated with Cashfree details');
 
       // Clear cart
       localStorage.removeItem('courseCart');
 
-      // Redirect to Cashfree payment page
-      let paymentUrl;
-      
-      // Only use the payment URL provided by our Edge Function
-      if (cashfreeOrder.payment_url) {
-        paymentUrl = cashfreeOrder.payment_url;
-      } else {
-        console.error('Cashfree response:', cashfreeOrder);
-        throw new Error('No valid payment URL received from payment service');
+      // Initialize Cashfree SDK and open payment popup
+      if (!window.Cashfree) {
+        throw new Error('Cashfree SDK not loaded. Please refresh the page and try again.');
       }
       
-      console.log('Redirecting to payment URL:', paymentUrl);
+      const cashfree = window.Cashfree({ mode: "production" });
       
-      // Redirect immediately
-      window.location.href = paymentUrl;
+      console.log('Opening Cashfree payment popup with order token:', cashfreeOrder.order_token);
+      
+      cashfree.pay({
+        orderToken: cashfreeOrder.order_token,
+        onSuccess: (data: any) => {
+          console.log("Payment Success:", data);
+          window.location.href = `${window.location.origin}/payment-success?order_id=${cashfreeOrder.order_id}&status=success`;
+        },
+        onFailure: (data: any) => {
+          console.log("Payment Failed:", data);
+          alert('Payment failed. Please try again.');
+          setProcessing(false);
+        },
+        onClose: () => {
+          console.log("Payment popup closed");
+          setProcessing(false);
+        }
+      });
 
     } catch (error) {
       console.error('Payment error:', error);

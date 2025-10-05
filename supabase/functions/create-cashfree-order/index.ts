@@ -17,7 +17,7 @@ interface OrderRequest {
   }
   order_meta: {
     return_url: string
-    notify_url?: string
+    notify_url: string
   }
 }
 
@@ -36,19 +36,18 @@ serve(async (req: Request) => {
     const { order_amount, order_currency, customer_details, order_meta }: OrderRequest = await req.json()
     console.log('Order request data:', { order_amount, order_currency, customer_details: { ...customer_details, customer_phone: customer_details.customer_phone ? 'PROVIDED' : 'MISSING' } });
 
-    // Get Cashfree credentials from environment variables
-    const CASHFREE_ENVIRONMENT = "production"
-    const CASHFREE_APP_ID = Deno.env.get("CASHFREE_ENVIRONMENT_APPID")
-    const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_ENVIRONMENT_SECRET_KEY")
+    // Get Cashfree production credentials from environment variables
+    const CASHFREE_APP_ID = Deno.env.get("CASHFREE_PRODUCTION_APPID")
+    const CASHFREE_SECRET_KEY = Deno.env.get("CASHFREE_PRODUCTION_SECRET_KEY")
 
     console.log('Environment check:', {
       hasAppId: !!CASHFREE_APP_ID,
       hasSecretKey: !!CASHFREE_SECRET_KEY,
-      environment: CASHFREE_ENVIRONMENT
+      environment: "production"
     });
 
     if (!CASHFREE_APP_ID || !CASHFREE_SECRET_KEY) {
-      const errorMsg = "Cashfree credentials not configured. Please check CASHFREE_ENVIRONMENT_APPID and CASHFREE_ENVIRONMENT_SECRET_KEY in Supabase secrets."
+      const errorMsg = "Cashfree production credentials not configured. Please check CASHFREE_PRODUCTION_APPID and CASHFREE_PRODUCTION_SECRET_KEY in Supabase secrets."
       console.error(errorMsg);
       throw new Error(errorMsg)
     }
@@ -99,32 +98,11 @@ serve(async (req: Request) => {
       throw new Error(errorMsg)
     }
 
-    // Log the full response structure for debugging
-    console.log('Full Cashfree response structure:', JSON.stringify(cashfreeResponse, null, 2));
-
-    // Extract payment URL from various possible fields
-    let paymentUrl = null;
-    
-    if (cashfreeResponse.payment_link) {
-      paymentUrl = cashfreeResponse.payment_link;
-      console.log('Using payment_link:', paymentUrl);
-    } else if (cashfreeResponse.checkout_url) {
-      paymentUrl = cashfreeResponse.checkout_url;
-      console.log('Using checkout_url:', paymentUrl);
-    } else if (cashfreeResponse.payment_session_id) {
-      // Construct URL using session ID
-      paymentUrl = `https://payments.cashfree.com/pay/${cashfreeResponse.payment_session_id}`;
-      console.log('Constructed URL from session ID:', paymentUrl);
-    } else if (cashfreeResponse.order_token) {
-      // Alternative construction using order token
-      paymentUrl = `https://payments.cashfree.com/pay/order_token/${cashfreeResponse.order_token}`;
-      console.log('Constructed URL from order token:', paymentUrl);
-    }
-
-    if (!paymentUrl) {
-      console.error('No valid payment URL found in response');
-      console.error('Available fields:', Object.keys(cashfreeResponse));
-      throw new Error('No valid payment URL received from Cashfree API');
+    // Validate that we received an order_token
+    if (!cashfreeResponse.order_token) {
+      console.error('No order_token received from Cashfree API');
+      console.error('Response:', cashfreeResponse);
+      throw new Error('No order_token received from Cashfree API');
     }
 
     console.log('Order created successfully');
@@ -132,9 +110,9 @@ serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         data: {
-          ...cashfreeResponse,
-          payment_url: paymentUrl,
-          session_id: cashfreeResponse.payment_session_id
+          order_id: cashfreeResponse.order_id,
+          order_token: cashfreeResponse.order_token,
+          payment_session_id: cashfreeResponse.payment_session_id
         },
         order_expiry_time: new Date(Date.now() + 30 * 60 * 1000).toISOString()
       }),
