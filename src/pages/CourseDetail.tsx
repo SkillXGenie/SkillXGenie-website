@@ -548,7 +548,7 @@ const CourseDetail = () => {
     if (!course) return;
     
     const priceString = plan === 'short' ? course.shortTermPrice : course.longTermPrice;
-    const newItem = { courseId: course.id, plan, price };
+    const newItem = { courseId: course.id, plan, price: priceString };
     
     // Check if item already exists
     const savedCart = localStorage.getItem('courseCart');
