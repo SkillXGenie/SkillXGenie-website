@@ -58,7 +58,7 @@ const Navbar = () => {
   const getUser = async () => {
     try {
       const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) {
+      if (error && error.message !== 'Authentication not configured') {
         console.error('Error getting user:', error);
         return;
       }
@@ -72,7 +72,10 @@ const Navbar = () => {
         setProfile(basicProfile);
       }
     } catch (error) {
-      console.error('Error getting user:', error);
+      // Silently handle errors when Supabase is not configured
+      if (error.message !== 'Authentication not configured') {
+        console.error('Error getting user:', error);
+      }
     }
   };
 

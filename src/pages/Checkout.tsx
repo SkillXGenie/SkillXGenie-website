@@ -568,6 +568,7 @@ const Checkout = () => {
       
       if (error) {
         console.error('Supabase auth error:', error);
+        console.error('Error details:', {
           message: error.message,
           status: error.status,
           statusText: error.statusText
@@ -707,4 +708,4 @@ const Checkout = () => {
   );
 };
 
-export default Checkout
+export default Checkout;
