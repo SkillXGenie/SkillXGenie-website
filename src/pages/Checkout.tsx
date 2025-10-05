@@ -239,6 +239,9 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
           }
         })
       });
+      throw error;
+    }
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
