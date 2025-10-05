@@ -769,6 +769,8 @@ const CourseDetail = () => {
               </div>
             </div>
 
+            {/* Course content */}
+            <div className="bg-white rounded-xl p-6 shadow-lg">
               <h2 className="text-2xl font-bold mb-6">Course content</h2>
               
               <div className="mb-4 text-sm text-gray-600">
