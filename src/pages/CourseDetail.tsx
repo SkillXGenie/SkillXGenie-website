@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { supabase } from '../lib/supabaseClient';
+import AuthModal from '../components/auth/AuthModal';
 import { 
   Star, 
   Users, 
@@ -520,6 +522,8 @@ const courses = [
 const CourseDetail = () => {
   const { courseId } = useParams();
   const navigate = useNavigate();
+  const [user, setUser] = useState<any>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<'short' | 'long'>('short');
   const [reviews, setReviews] = useState<Array<{id: number, name: string, rating: number, comment: string, date: string}>>([]);
@@ -527,17 +531,43 @@ const CourseDetail = () => {
   const [cart, setCart] = useState<Array<{courseId: string, plan: 'short' | 'long', price: string}>>([]);
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
+  const [pendingPurchase, setPendingPurchase] = useState<'short' | 'long' | null>(null);
 
   const course = courses.find(c => c.id === courseId);
   const content = courseContent[courseId || ''];
 
   useEffect(() => {
+    getUser();
     // Load cart from localStorage
     const savedCart = localStorage.getItem('courseCart');
     if (savedCart) {
       setCart(JSON.parse(savedCart));
     }
   }, []);
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        getUser();
+        // If there was a pending purchase, proceed with it
+        if (pendingPurchase) {
+          handleBuyNow(pendingPurchase);
+          setPendingPurchase(null);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [pendingPurchase]);
+
+  const getUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    setUser(user);
+  };
 
   const saveCart = (newCart: typeof cart) => {
     setCart(newCart);
@@ -565,6 +595,22 @@ const CourseDetail = () => {
     } else {
       alert('Course already in cart!');
     }
+  };
+
+  const handleBuyNow = (plan: 'short' | 'long') => {
+    if (!user) {
+      // Save the intended purchase and show login modal
+      setPendingPurchase(plan);
+      // Also add to cart so it's saved
+      addToCart(plan);
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    // User is logged in, proceed with purchase
+    const priceString = plan === 'short' ? course!.shortTermPrice : course!.longTermPrice;
+    alert(`Proceeding to checkout for ${course!.title} - ${plan === 'short' ? 'Short-Term' : 'Long-Term'} plan (${priceString})`);
+    // Here you would integrate with your payment processor
   };
 
   const toggleModule = (moduleTitle: string) => {
@@ -703,7 +749,10 @@ const CourseDetail = () => {
                 >
                   Add to cart
                 </button>
-                <button className="w-full border-2 border-purple-600 text-purple-600 py-3 px-6 rounded-lg hover:bg-purple-50 transition-colors font-semibold">
+                <button
+                  onClick={() => handleBuyNow(selectedPlan)}
+                  className="w-full border-2 border-purple-600 text-purple-600 py-3 px-6 rounded-lg hover:bg-purple-50 transition-colors font-semibold"
+                >
                   Buy now
                 </button>
               </div>
@@ -852,7 +901,10 @@ const CourseDetail = () => {
                         >
                           Add to Cart
                         </button>
-                        <button className="w-full border border-green-600 text-green-600 py-2 px-4 rounded-lg hover:bg-green-50 transition-colors">
+                        <button
+                          onClick={() => handleBuyNow('short')}
+                          className="w-full border border-green-600 text-green-600 py-2 px-4 rounded-lg hover:bg-green-50 transition-colors"
+                        >
                           Buy Now
                         </button>
                       </div>
@@ -874,7 +926,10 @@ const CourseDetail = () => {
                         >
                           Add to Cart
                         </button>
-                        <button className="w-full border border-blue-600 text-blue-600 py-2 px-4 rounded-lg hover:bg-blue-50 transition-colors">
+                        <button
+                          onClick={() => handleBuyNow('long')}
+                          className="w-full border border-blue-600 text-blue-600 py-2 px-4 rounded-lg hover:bg-blue-50 transition-colors"
+                        >
                           Buy Now
                         </button>
                       </div>
@@ -1062,6 +1117,14 @@ const CourseDetail = () => {
           </div>
         </div>
       </div>
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => {
+          setIsAuthModalOpen(false);
+          setPendingPurchase(null);
+        }}
+      />
     </div>
   );
 };

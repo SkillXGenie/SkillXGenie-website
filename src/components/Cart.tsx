@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShoppingCart, Trash2, IndianRupee } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
+import AuthModal from './auth/AuthModal';
 
 interface CartItem {
   courseId: string;
@@ -53,8 +55,11 @@ const courses = [
 
 const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [user, setUser] = useState<any>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
+    getUser();
     if (isOpen) {
       const savedCart = localStorage.getItem('courseCart');
       if (savedCart) {
@@ -62,6 +67,25 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
       }
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        getUser();
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  const getUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    setUser(user);
+  };
 
   const removeFromCart = (index: number) => {
     const newCart = cartItems.filter((_, i) => i !== index);
@@ -82,7 +106,24 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
     return courses.find(c => c.id === courseId);
   };
 
+  const handleCheckout = () => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    if (cartItems.length === 0) {
+      alert('Your cart is empty!');
+      return;
+    }
+
+    // Proceed with checkout
+    alert(`Proceeding to checkout with ${cartItems.length} items. Total: ₹${getTotalPrice().toLocaleString()}`);
+    // Here you would integrate with your payment processor
+  };
+
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <>
@@ -175,7 +216,10 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
                       </div>
                     </div>
                     
-                    <button className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors font-semibold mb-3">
+                    <button 
+                      onClick={handleCheckout}
+                      className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors font-semibold mb-3"
+                    >
                       Checkout
                     </button>
                     
@@ -193,6 +237,12 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
         </>
       )}
     </AnimatePresence>
+
+    <AuthModal
+      isOpen={isAuthModalOpen}
+      onClose={() => setIsAuthModalOpen(false)}
+    />
+    </>
   );
 };
 
