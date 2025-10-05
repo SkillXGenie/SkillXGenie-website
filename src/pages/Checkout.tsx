@@ -226,7 +226,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       // First, save order to database
       const orderNumber = generateOrderNumber();
       const orderData = {
-        user_id: user.id,
+        user_id: user?.id || null,
         order_number: orderNumber,
         customer_name: billingDetails.name,
         customer_email: billingDetails.email,
@@ -244,6 +244,27 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         payment_status: 'pending',
         created_at: new Date().toISOString()
       };
+
+      // Ensure user profile exists before creating order
+      if (user?.id) {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .single();
+
+        if (!existingProfile) {
+          // Create profile if it doesn't exist
+          await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              name: billingDetails.name,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+        }
+      }
 
       console.log('Saving order to database...');
       const savedOrder = await saveOrderToDatabase(orderData);
