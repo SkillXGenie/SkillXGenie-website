@@ -559,20 +559,43 @@ const Checkout = () => {
 
   const getUser = async () => {
     try {
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const { data: { user }, error } = await supabase.auth.getUser();
+      clearTimeout(timeoutId);
+      
       if (error) {
-        console.error('Error getting user:', error);
+        console.error('Supabase auth error:', error);
+        console.error('Error details:', {
+          message: error.message,
+          status: error.status,
+          statusText: error.statusText
+        });
         navigate('/courses');
         return;
       }
       if (!user) {
+        console.log('No user found, redirecting to courses');
         navigate('/courses');
         return;
       }
       setUser(user);
       setLoading(false);
     } catch (error) {
-      console.error('Error getting user:', error);
+      console.error('Network error getting user:', error);
+      console.error('Error type:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+      console.error('Supabase Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+      
+      // Check if it's a network error
+      if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+        console.error('Network connectivity issue detected');
+        alert('Unable to connect to the server. Please check your internet connection and try again.');
+      }
+      
       navigate('/courses');
     }
   };
@@ -686,3 +709,5 @@ const Checkout = () => {
 };
 
 export default Checkout;
+
+export default Checkout
