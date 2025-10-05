@@ -37,7 +37,7 @@ const courses: Course[] = [
     longTermFocus: "In-depth understanding of business models, case studies, and personal mentorship.",
     emoji: "💼",
     rating: 4.8,
-    students: 1250,
+    students: 0,
     totalHours: "4h 20m",
     lectures: 24
   },
@@ -55,7 +55,7 @@ const courses: Course[] = [
     longTermFocus: "Advanced speaking, presentation skills, interview preparation, and fluency refinement.",
     emoji: "🗣️",
     rating: 4.7,
-    students: 2100,
+    students: 0,
     totalHours: "4h",
     lectures: 28
   },
@@ -73,7 +73,7 @@ const courses: Course[] = [
     longTermFocus: "Advanced projects, automation systems, and AI integration in robotics.",
     emoji: "🤖",
     rating: 4.9,
-    students: 890,
+    students: 0,
     totalHours: "4h 30m",
     lectures: 25
   },
@@ -91,7 +91,7 @@ const courses: Course[] = [
     longTermFocus: "Data structures, algorithms, and mini-projects.",
     emoji: "💻",
     rating: 4.6,
-    students: 1800,
+    students: 0,
     totalHours: "3h 45m",
     lectures: 22
   },
@@ -109,7 +109,7 @@ const courses: Course[] = [
     longTermFocus: "Advanced concepts and project development.",
     emoji: "💡",
     rating: 4.7,
-    students: 1450,
+    students: 0,
     totalHours: "4h",
     lectures: 25
   },
@@ -127,7 +127,7 @@ const courses: Course[] = [
     longTermFocus: "GUI, APIs, and mini-projects like login systems or apps.",
     emoji: "☕",
     rating: 4.8,
-    students: 1650,
+    students: 0,
     totalHours: "4h 20m",
     lectures: 26
   },
@@ -145,7 +145,7 @@ const courses: Course[] = [
     longTermFocus: "Advanced topics including OOP, libraries (NumPy, Pandas), and AI/ML basics.",
     emoji: "🐍",
     rating: 4.9,
-    students: 2300,
+    students: 0,
     totalHours: "4h 30m",
     lectures: 28
   }
@@ -164,6 +164,17 @@ const Courses = () => {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [hoveredCourse, setHoveredCourse] = useState<string | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const updateWindowSize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    
+    updateWindowSize();
+    window.addEventListener('resize', updateWindowSize);
+    return () => window.removeEventListener('resize', updateWindowSize);
+  }, []);
 
   const filteredCourses = selectedCategory === "All" 
     ? courses 
@@ -171,6 +182,37 @@ const Courses = () => {
 
   const handleMouseMove = (e: React.MouseEvent) => {
     setMousePosition({ x: e.clientX, y: e.clientY });
+  };
+
+  const getPopupPosition = () => {
+    const popupWidth = 384; // max-w-md = 384px
+    const popupHeight = 300; // approximate height
+    const margin = 20;
+    
+    let left = mousePosition.x + 20;
+    let top = mousePosition.y - 100;
+    
+    // Adjust if popup would go off right edge
+    if (left + popupWidth > windowSize.width - margin) {
+      left = mousePosition.x - popupWidth - 20;
+    }
+    
+    // Adjust if popup would go off left edge
+    if (left < margin) {
+      left = margin;
+    }
+    
+    // Adjust if popup would go off top edge
+    if (top < margin) {
+      top = margin;
+    }
+    
+    // Adjust if popup would go off bottom edge
+    if (top + popupHeight > windowSize.height - margin) {
+      top = windowSize.height - popupHeight - margin;
+    }
+    
+    return { left, top };
   };
 
   const handleCourseClick = (courseId: string) => {
@@ -304,8 +346,8 @@ const Courses = () => {
               transition={{ duration: 0.2 }}
               className="fixed z-50 bg-white p-6 rounded-xl shadow-2xl border max-w-md"
               style={{
-                left: mousePosition.x + 20,
-                top: mousePosition.y - 100,
+                left: getPopupPosition().left,
+                top: getPopupPosition().top,
                 pointerEvents: 'none'
               }}
             >

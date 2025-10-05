@@ -381,10 +381,10 @@ const courses = [
     longTermFocus: "In-depth understanding of business models, case studies, and personal mentorship.",
     emoji: "💼",
     rating: 4.8,
-    students: 1250,
+    students: 0,
     totalHours: "4h 20m",
     lectures: 24,
-    instructor: "Sarah Johnson",
+    instructor: "SkillXGenie",
     lastUpdated: "December 2024",
     language: "English",
     level: "Beginner"
@@ -402,10 +402,10 @@ const courses = [
     longTermFocus: "Advanced speaking, presentation skills, interview preparation, and fluency refinement.",
     emoji: "🗣️",
     rating: 4.7,
-    students: 2100,
+    students: 0,
     totalHours: "4h",
     lectures: 28,
-    instructor: "Michael Rodriguez",
+    instructor: "SkillXGenie",
     lastUpdated: "December 2024",
     language: "English",
     level: "All Levels"
@@ -423,10 +423,10 @@ const courses = [
     longTermFocus: "Advanced projects, automation systems, and AI integration in robotics.",
     emoji: "🤖",
     rating: 4.9,
-    students: 890,
+    students: 0,
     totalHours: "4h 30m",
     lectures: 25,
-    instructor: "Dr. Alex Chen",
+    instructor: "SkillXGenie",
     lastUpdated: "December 2024",
     language: "English",
     level: "Beginner"
@@ -444,10 +444,10 @@ const courses = [
     longTermFocus: "Data structures, algorithms, and mini-projects.",
     emoji: "💻",
     rating: 4.6,
-    students: 1800,
+    students: 0,
     totalHours: "3h 45m",
     lectures: 22,
-    instructor: "John Smith",
+    instructor: "SkillXGenie",
     lastUpdated: "December 2024",
     language: "English",
     level: "Beginner"
@@ -465,10 +465,10 @@ const courses = [
     longTermFocus: "Advanced concepts and project development.",
     emoji: "💡",
     rating: 4.7,
-    students: 1450,
+    students: 0,
     totalHours: "4h",
     lectures: 25,
-    instructor: "Lisa Wang",
+    instructor: "SkillXGenie",
     lastUpdated: "December 2024",
     language: "English",
     level: "Intermediate"
@@ -486,10 +486,10 @@ const courses = [
     longTermFocus: "GUI, APIs, and mini-projects like login systems or apps.",
     emoji: "☕",
     rating: 4.8,
-    students: 1650,
+    students: 0,
     totalHours: "4h 20m",
     lectures: 26,
-    instructor: "David Park",
+    instructor: "SkillXGenie",
     lastUpdated: "December 2024",
     language: "English",
     level: "Beginner"
@@ -507,10 +507,10 @@ const courses = [
     longTermFocus: "Advanced topics including OOP, libraries (NumPy, Pandas), and AI/ML basics.",
     emoji: "🐍",
     rating: 4.9,
-    students: 2300,
+    students: 0,
     totalHours: "4h 30m",
     lectures: 28,
-    instructor: "Emma Thompson",
+    instructor: "SkillXGenie",
     lastUpdated: "December 2024",
     language: "English",
     level: "Beginner"
@@ -525,6 +525,8 @@ const CourseDetail = () => {
   const [reviews, setReviews] = useState<Array<{id: number, name: string, rating: number, comment: string, date: string}>>([]);
   const [newReview, setNewReview] = useState({ name: '', rating: 5, comment: '' });
   const [cart, setCart] = useState<Array<{courseId: string, plan: 'short' | 'long', price: string}>>([]);
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
+  const [allExpanded, setAllExpanded] = useState(false);
 
   const course = courses.find(c => c.id === courseId);
   const content = courseContent[courseId || ''];
@@ -560,11 +562,18 @@ const CourseDetail = () => {
   };
 
   const toggleModule = (moduleTitle: string) => {
-    setExpandedModules(prev =>
-      prev.includes(moduleTitle)
-        ? prev.filter(m => m !== moduleTitle)
-        : [...prev, moduleTitle]
-    );
+    // Show purchase modal instead of expanding
+    setShowPurchaseModal(true);
+  };
+
+  const expandAllSections = () => {
+    if (allExpanded) {
+      setExpandedModules([]);
+      setAllExpanded(false);
+    } else {
+      // Show purchase modal for expanding all
+      setShowPurchaseModal(true);
+    }
   };
 
   const submitReview = (e: React.FormEvent) => {
@@ -759,7 +768,8 @@ const CourseDetail = () => {
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold">Course content</h2>
                 <button className="text-purple-600 hover:text-purple-700 font-medium">
-                  Expand all sections
+                  onClick={expandAllSections}
+                  {allExpanded ? 'Collapse all sections' : 'Expand all sections'}
                 </button>
               </div>
               
@@ -809,6 +819,76 @@ const CourseDetail = () => {
                   </div>
                 ))}
               </div>
+
+              {/* Purchase Modal */}
+              {showPurchaseModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-xl p-8 max-w-md w-full mx-4">
+                    <div className="text-center mb-6">
+                      <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H10m2-5V9m0 0V7m0 2h2m-2 0H10" />
+                        </svg>
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">Content Locked</h3>
+                      <p className="text-gray-600">Purchase this course to access all content and lectures.</p>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium">Short-Term (30 Days)</span>
+                          <div className="flex items-center font-bold text-green-600">
+                            <IndianRupee className="h-4 w-4" />
+                            <span>299</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            addToCart('short');
+                            setShowPurchaseModal(false);
+                          }}
+                          className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors mb-2"
+                        >
+                          Add to Cart
+                        </button>
+                        <button className="w-full border border-green-600 text-green-600 py-2 px-4 rounded-lg hover:bg-green-50 transition-colors">
+                          Buy Now
+                        </button>
+                      </div>
+                      
+                      <div className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium">Long-Term (3-4 Months)</span>
+                          <div className="flex items-center font-bold text-blue-600">
+                            <IndianRupee className="h-4 w-4" />
+                            <span>2,999</span>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            addToCart('long');
+                            setShowPurchaseModal(false);
+                          }}
+                          className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors mb-2"
+                        >
+                          Add to Cart
+                        </button>
+                        <button className="w-full border border-blue-600 text-blue-600 py-2 px-4 rounded-lg hover:bg-blue-50 transition-colors">
+                          Buy Now
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => setShowPurchaseModal(false)}
+                      className="w-full mt-4 text-gray-500 hover:text-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Long-term course info */}
               <div className="mt-6 p-4 bg-blue-50 rounded-lg">
@@ -944,7 +1024,7 @@ const CourseDetail = () => {
                 </div>
                 <div className="flex items-center">
                   <Users className="h-4 w-4 mr-2" />
-                  <span>{course.students} Students</span>
+                  <span>{course.students} students</span>
                 </div>
                 <div className="flex items-center">
                   <BookOpen className="h-4 w-4 mr-2" />
