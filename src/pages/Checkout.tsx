@@ -292,15 +292,15 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       // Redirect to Cashfree payment page
       let paymentUrl;
       
-      if (cashfreeOrder.payment_url) {
-        paymentUrl = cashfreeOrder.payment_url;
-      } else if (cashfreeOrder.payment_link) {
+      if (cashfreeOrder.payment_link) {
         paymentUrl = cashfreeOrder.payment_link;
+      } else if (cashfreeOrder.payment_url) {
+        paymentUrl = cashfreeOrder.payment_url;
       } else if (cashfreeOrder.checkout_url) {
         paymentUrl = cashfreeOrder.checkout_url;
       } else if (cashfreeOrder.payment_session_id) {
-        // Try different URL formats
-        paymentUrl = `https://checkout.cashfree.com/pay/${cashfreeOrder.payment_session_id}`;
+        // Use the correct Cashfree payment URL format
+        paymentUrl = `https://payments.cashfree.com/pay/${cashfreeOrder.payment_session_id}`;
       } else {
         console.error('Cashfree response:', cashfreeOrder);
         throw new Error('No payment URL received from Cashfree');
@@ -692,3 +692,5 @@ const Checkout = () => {
 };
 
 export default Checkout;
+
+export default Checkout

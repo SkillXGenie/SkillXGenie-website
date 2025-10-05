@@ -118,10 +118,11 @@ serve(async (req: Request) => {
         success: true,
         data: {
           ...cashfreeResponse,
-          // Use the checkout_url from Cashfree response or construct it properly
-          payment_url: cashfreeResponse.checkout_url || 
+          // Use Cashfree's provided payment_link or construct the correct URL
+          payment_url: cashfreeResponse.payment_link || 
+                      cashfreeResponse.checkout_url ||
                       (cashfreeResponse.payment_session_id 
-                        ? `https://checkout.cashfree.com/pay/${cashfreeResponse.payment_session_id}`
+                        ? `https://payments.cashfree.com/pay/${cashfreeResponse.payment_session_id}`
                         : null),
           payment_methods: "cc,dc,ppc,ccc,emi,paypal,upi,nb,app,paylater",
           session_id: cashfreeResponse.payment_session_id
