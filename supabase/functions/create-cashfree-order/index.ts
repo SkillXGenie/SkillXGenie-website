@@ -58,9 +58,7 @@ serve(async (req: Request) => {
     console.log('Generated order ID:', order_id);
 
     // Cashfree API endpoint
-    const cashfreeUrl = CASHFREE_ENVIRONMENT === "production" 
-      ? "https://api.cashfree.com/pg/orders"
-      : "https://sandbox.cashfree.com/pg/orders"
+    const cashfreeUrl = "https://api.cashfree.com/pg/orders"
 
     console.log('Using Cashfree URL:', cashfreeUrl);
 
