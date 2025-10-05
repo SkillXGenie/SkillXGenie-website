@@ -38,8 +38,16 @@ const Navbar = () => {
   };
 
   useEffect(() => {
-    const interval = setInterval(updateCartCount, 1000);
-    return () => clearInterval(interval);
+    // Listen for storage events to update cart count
+    const handleStorageChange = () => {
+      updateCartCount();
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   const getUser = async () => {

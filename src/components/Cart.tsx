@@ -156,7 +156,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
                               <div className="flex items-center justify-between mt-2">
                                 <div className="flex items-center font-bold text-lg">
                                   <IndianRupee className="h-4 w-4" />
-                                  <span>{item.price.replace('₹', '')}</span>
+                                  <span>{item.price.replace('₹', '').replace(',', '')}</span>
                                 </div>
                               </div>
                             </div>
@@ -171,7 +171,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
                       <span className="text-lg font-semibold">Total:</span>
                       <div className="flex items-center text-2xl font-bold">
                         <IndianRupee className="h-6 w-6" />
-                        <span>{getTotalPrice()}</span>
+                        <span>{getTotalPrice().toLocaleString()}</span>
                       </div>
                     </div>
                     
