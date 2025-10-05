@@ -439,13 +439,23 @@ const Checkout = () => {
   }, []);
 
   const getUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error('Error getting user:', error);
+        navigate('/courses');
+        return;
+      }
+      if (!user) {
+        navigate('/courses');
+        return;
+      }
+      setUser(user);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error getting user:', error);
       navigate('/courses');
-      return;
     }
-    setUser(user);
-    setLoading(false);
   };
 
   const loadCartItems = () => {
