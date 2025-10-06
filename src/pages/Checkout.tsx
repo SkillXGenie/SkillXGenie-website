@@ -27,13 +27,10 @@ interface Course {
   emoji: string;
 }
 
-// Declare Cashfree global type for v2.0.0
+// Declare Cashfree global type
 declare global {
   interface Window {
-    Cashfree: {
-      init: (config: { mode: string }) => void;
-      open: (options: any) => void;
-    };
+    Cashfree: any;
   }
 }
 
@@ -111,9 +108,9 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
       console.log('🔄 Loading Cashfree SDK script...');
 
-      // Create and load the v2.0.0 production script
+      // Create and load the SDK script
       const script = document.createElement('script');
-      script.src = 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.prod.js';
+      script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
       script.type = 'text/javascript';
       script.async = true;
 
@@ -138,13 +135,13 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   };
 
   /**
-   * Initialize Cashfree SDK v2.0.0 in production mode
+   * Initialize Cashfree SDK in production mode
    */
   const initializeCashfreeSDK = async () => {
     setSdkLoading(true);
 
     try {
-      console.log('🔄 Initializing Cashfree SDK v2.0.0 (production)...');
+      console.log('🔄 Initializing Cashfree SDK...');
 
       // Load the SDK script
       const CashfreeLib = await loadCashfreeSDKScript();
@@ -153,20 +150,14 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         throw new Error('Cashfree SDK not loaded');
       }
 
-      console.log('✅ Cashfree SDK loaded');
-      console.log('📋 SDK methods:', Object.keys(CashfreeLib));
+      console.log('✅ Cashfree loaded, initializing with mode: production');
 
-      // Initialize Cashfree SDK with production mode
-      if (typeof CashfreeLib.init === 'function') {
-        CashfreeLib.init({ mode: "production" });
-        console.log('✅ Cashfree initialized in production mode');
-      } else {
-        console.warn('⚠️ Cashfree.init not found, SDK may already be initialized');
-      }
+      // Initialize Cashfree with production mode
+      const cashfreeInstance = CashfreeLib({ mode: "production" });
 
-      setCashfreeSDK(CashfreeLib);
+      setCashfreeSDK(cashfreeInstance);
       setSdkLoading(false);
-      console.log('✅ Cashfree SDK ready for use');
+      console.log('✅ Cashfree SDK initialized successfully');
 
     } catch (error: any) {
       console.error('❌ Failed to initialize Cashfree SDK:', error);
@@ -311,7 +302,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     console.log('📋 Order ID:', orderId);
     console.log('📋 Session ID:', sessionId);
     console.log('📋 SDK Available:', !!cashfreeSDK);
-    console.log('📋 SDK.open method:', typeof cashfreeSDK?.open);
+    console.log('📋 SDK.checkout method:', typeof cashfreeSDK?.checkout);
 
     // Validate session ID
     if (!sessionId) {
@@ -319,51 +310,38 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       throw new Error('No payment session ID received from backend');
     }
 
-    // Build payment options for Cashfree v2.0.0
+    // Build payment options
     const paymentOptions = {
       paymentSessionId: sessionId,
       returnUrl: `${window.location.origin}/payment-success?order_id=${orderId}`,
-      notifyUrl: `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-webhook`,
     };
 
     console.log('📋 Payment options:', JSON.stringify(paymentOptions, null, 2));
 
     // Try popup mode first
-    if (cashfreeSDK && typeof cashfreeSDK.open === 'function') {
+    if (cashfreeSDK && typeof cashfreeSDK.checkout === 'function') {
       console.log('💳 Attempting popup mode...');
 
       try {
-        // Add callbacks
-        const result = cashfreeSDK.open({
+        cashfreeSDK.checkout({
           ...paymentOptions,
-          onSuccess: function(data: any) {
+          onSuccess: (data: any) => {
             console.log('✅ Payment Success:', data);
             setProcessing(false);
             window.location.href = `${window.location.origin}/payment-success?order_id=${orderId}&status=success`;
           },
-          onFailure: function(data: any) {
+          onFailure: (data: any) => {
             console.error('❌ Payment Failed:', data);
             setProcessing(false);
             alert('Payment failed. Please try again.');
           },
-          onClose: function() {
+          onClose: () => {
             console.log('🔒 Payment popup closed by user');
             setProcessing(false);
           }
         });
 
-        console.log('✅ Cashfree.open() called successfully:', result);
-
-        // If result is undefined or false, the popup might have failed
-        if (result === false || result === undefined) {
-          console.warn('⚠️ Cashfree.open() returned falsy value, might have failed');
-          // Wait a bit to see if popup opens
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          // If we're still here and processing, assume popup didn't open
-          if (processing) {
-            throw new Error('Popup failed to open');
-          }
-        }
+        console.log('✅ Cashfree.checkout() called successfully');
 
       } catch (popupError: any) {
         console.error('❌ Popup failed:', popupError);
@@ -378,7 +356,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         window.location.href = redirectUrl;
       }
     } else {
-      console.warn('⚠️ SDK.open not available, using redirect mode');
+      console.warn('⚠️ SDK.checkout not available, using redirect mode');
 
       // Direct redirect to Cashfree hosted checkout
       const redirectUrl = `https://payments.cashfree.com/order/#${sessionId}`;
