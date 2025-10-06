@@ -148,6 +148,7 @@ Deno.serve(async (req: Request) => {
 
     console.log('✅ [Cashfree] Order created successfully!');
     console.log('🎫 [Cashfree] Order token:', orderToken.substring(0, 20) + '...');
+    console.log('🔑 [Cashfree] App ID:', CASHFREE_APP_ID?.substring(0, 10) + '...');
 
     return new Response(
       JSON.stringify({
@@ -156,7 +157,8 @@ Deno.serve(async (req: Request) => {
           order_id: orderId,
           order_token: orderToken,
           payment_session_id: orderToken,
-          cf_order_id: orderId
+          cf_order_id: orderId,
+          app_id: CASHFREE_APP_ID
         },
         order_expiry_time: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
         message: "Fresh order token created successfully"

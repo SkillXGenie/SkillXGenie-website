@@ -386,6 +386,20 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
     const sessionId = cashfreeOrder.payment_session_id || cashfreeOrder.order_token;
     const orderId = cashfreeOrder.order_id;
+    const appId = cashfreeOrder.app_id;
+
+    // CRITICAL: Validate appId first
+    if (!appId) {
+      const errorMsg = '❌ CRITICAL: appId is missing from backend response';
+      console.error(errorMsg);
+      console.error('📋 Order data received:', JSON.stringify(cashfreeOrder, null, 2));
+      showError('Payment configuration error. Please contact support.');
+      setProcessing(false);
+      setShowFallbackOptions(true);
+      return;
+    }
+
+    console.log('🔑 App ID received:', appId.substring(0, 10) + '...' + appId.substring(appId.length - 4));
 
     // Validate required data
     if (!sessionId) {
@@ -438,6 +452,8 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     };
 
     // Add required fields for Cashfree hosted checkout
+    // CRITICAL: appId must be the first field
+    addField('appId', appId);
     addField('orderId', orderId);
     addField('orderAmount', total.toString());
     addField('token', sessionId);
