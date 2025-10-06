@@ -234,9 +234,9 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
                       </div>
                     </div>
                     
-                    <button 
+                    <button
                       onClick={handleCheckout}
-                      className="w-full bg-purple-600 text-white py-3 px-6 rounded-lg hover:bg-purple-700 transition-colors font-semibold mb-3"
+                      className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors font-semibold mb-3"
                     >
                       Checkout
                     </button>
