@@ -77,22 +77,59 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
   // Initialize Cashfree SDK on component mount
   useEffect(() => {
-    initializeCashfreeSDK();
+    loadCashfreeScript();
   }, []);
 
   /**
+   * Dynamically load Cashfree SDK script
+   */
+  const loadCashfreeScript = () => {
+    console.log('🔄 Loading Cashfree SDK script...');
+
+    // Check if script already exists
+    if (document.querySelector('script[src*="cashfree.com"]')) {
+      console.log('✅ Cashfree script already loaded');
+      initializeCashfreeSDK();
+      return;
+    }
+
+    // Create and append script tag
+    const script = document.createElement('script');
+    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+    script.async = true;
+    script.defer = true;
+
+    script.onload = () => {
+      console.log('✅ Cashfree script loaded successfully');
+      initializeCashfreeSDK();
+    };
+
+    script.onerror = () => {
+      console.error('❌ Failed to load Cashfree script');
+      setSdkLoading(false);
+      alert('Failed to load payment system. Please check your internet connection and refresh the page.');
+    };
+
+    document.head.appendChild(script);
+  };
+
+  /**
    * Initialize Cashfree SDK in production mode
-   * This must be called before any payment operations
+   * This must be called after the script is loaded
    */
   const initializeCashfreeSDK = async () => {
     try {
       console.log('🔄 Initializing Cashfree SDK in production mode...');
       setSdkLoading(true);
 
+      // Wait a bit for the script to fully initialize
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       // Check if Cashfree is available on window
       if (!window.Cashfree) {
         console.error('❌ Cashfree SDK not found on window object');
         alert('Payment system not available. Please refresh the page.');
+        setSdkLoading(false);
         return;
       }
 
@@ -100,7 +137,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       const sdk = await window.Cashfree.load({ mode: "production" });
       setCashfreeSDK(sdk);
       console.log('✅ Cashfree SDK loaded successfully in production mode');
-      
+
     } catch (error) {
       console.error('❌ Failed to initialize Cashfree SDK:', error);
       alert('Failed to load payment system. Please refresh the page and try again.');
