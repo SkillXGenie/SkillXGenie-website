@@ -27,19 +27,10 @@ interface Course {
   emoji: string;
 }
 
-// Declare Cashfree global type
+// Declare Cashfree global type for v3
 declare global {
   interface Window {
-    Cashfree: {
-      load: (config: { mode: string }) => Promise<any>;
-      checkout: (options: {
-        paymentSessionId: string;
-        returnUrl?: string;
-        onSuccess?: (data: any) => void;
-        onFailure?: (data: any) => void;
-        onClose?: () => void;
-      }) => void;
-    };
+    Cashfree: any; // Constructor function in v3
   }
 }
 
@@ -144,43 +135,76 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   };
 
   /**
-   * Initialize Cashfree SDK in production mode
+   * Initialize Cashfree SDK v3 in production mode
    * Uses Promise-based loading without polling
    */
   const initializeCashfreeSDK = async () => {
     setSdkLoading(true);
 
     try {
-      console.log('🔄 Initializing Cashfree SDK...');
+      console.log('🔄 Initializing Cashfree SDK v3...');
 
       // Load the SDK script
-      const CashfreeSDK = await loadCashfreeSDKScript();
+      const CashfreeLib = await loadCashfreeSDKScript();
 
-      // Verify the load method exists
-      if (!CashfreeSDK || typeof CashfreeSDK.load !== 'function') {
-        throw new Error('Cashfree SDK loaded but .load() method is not available');
+      if (!CashfreeLib) {
+        throw new Error('Cashfree SDK not loaded');
       }
 
-      console.log('🔄 Calling Cashfree.load() with production mode...');
+      console.log('✅ Cashfree loaded, type:', typeof CashfreeLib);
+      console.log('Cashfree properties:', CashfreeLib);
 
-      // Initialize the SDK in production mode
-      const sdk = await CashfreeSDK.load({ mode: "production" });
+      // Try different initialization patterns based on SDK version
+      let cashfreeInstance;
 
-      if (!sdk) {
-        throw new Error('Cashfree SDK initialization returned null or undefined');
+      // Pattern 1: Check if it's a constructor function (new Cashfree())
+      if (typeof CashfreeLib === 'function') {
+        try {
+          console.log('🔄 Attempting to instantiate with new Cashfree({mode: "production"})...');
+          cashfreeInstance = new CashfreeLib({ mode: "production" });
+          console.log('✅ Successfully instantiated with constructor');
+        } catch (e) {
+          console.log('⚠️ Constructor pattern failed, trying direct usage');
+          // If constructor fails, use the function directly
+          cashfreeInstance = CashfreeLib;
+        }
+      }
+      // Pattern 2: It might be an object with methods already
+      else if (typeof CashfreeLib === 'object') {
+        console.log('✅ Cashfree is an object, using directly');
+        cashfreeInstance = CashfreeLib;
+      }
+      // Pattern 3: Fallback - just use it
+      else {
+        console.log('⚠️ Unknown Cashfree type, using as-is');
+        cashfreeInstance = CashfreeLib;
       }
 
-      setCashfreeSDK(sdk);
+      // Verify the instance has a checkout method
+      if (!cashfreeInstance || typeof cashfreeInstance.checkout !== 'function') {
+        console.error('⚠️ checkout method not found, available methods:',
+          cashfreeInstance ? Object.keys(cashfreeInstance) : 'none');
+
+        // For v3, the checkout method might be on the constructor itself
+        if (typeof CashfreeLib.checkout === 'function') {
+          console.log('✅ Found checkout on constructor, using that');
+          cashfreeInstance = CashfreeLib;
+        } else {
+          throw new Error('Cashfree SDK loaded but checkout method not found');
+        }
+      }
+
+      setCashfreeSDK(cashfreeInstance);
       setSdkLoading(false);
-      console.log('✅ Cashfree SDK initialized successfully in production mode');
-      console.log('SDK instance:', sdk);
+      console.log('✅ Cashfree SDK initialized successfully');
+      console.log('Available methods:', cashfreeInstance ? Object.getOwnPropertyNames(cashfreeInstance) : 'none');
 
     } catch (error: any) {
       console.error('❌ Failed to initialize Cashfree SDK:', error);
       console.error('Error details:', {
         message: error?.message || 'Unknown error',
         windowCashfree: typeof window.Cashfree,
-        hasLoad: window.Cashfree ? typeof window.Cashfree.load : 'N/A'
+        windowCashfreeKeys: window.Cashfree ? Object.keys(window.Cashfree) : []
       });
       setSdkLoading(false);
     }
