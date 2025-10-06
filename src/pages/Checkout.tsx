@@ -396,7 +396,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
           .from('profiles')
           .select('id')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (!existingProfile) {
           await supabase
