@@ -54,6 +54,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   const [cashfreeSDK, setCashfreeSDK] = useState<any>(null);
   const [sdkLoading, setSdkLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [lastCashfreeOrder, setLastCashfreeOrder] = useState<any>(null);
   const [billingDetails, setBillingDetails] = useState({
     name: user?.user_metadata?.name || '',
     email: user?.email || '',
@@ -68,9 +69,11 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   });
 
   // Show error toast
-  const showError = (message: string) => {
+  const showError = (message: string, showRetry: boolean = false) => {
     setErrorMessage(message);
-    setTimeout(() => setErrorMessage(null), 5000);
+    if (!showRetry) {
+      setTimeout(() => setErrorMessage(null), 5000);
+    }
   };
 
   // Initialize Cashfree SDK on component mount
@@ -308,33 +311,85 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
   /**
    * Submit form to Cashfree hosted checkout page
+   * This is the proper way to redirect to Cashfree's hosted payment page
    */
-  const submitToHostedCheckout = (sessionId: string, orderId: string) => {
+  const submitToHostedCheckout = (cashfreeOrder: any) => {
     console.log('📝 Creating form for hosted checkout...');
+    console.log('📋 Order data:', cashfreeOrder);
+
+    const sessionId = cashfreeOrder.payment_session_id || cashfreeOrder.order_token;
+    const orderId = cashfreeOrder.order_id;
+
+    // Validate required data
+    if (!sessionId) {
+      const errorMsg = '❌ Missing order token for form submission';
+      console.error(errorMsg);
+      showError('Payment token missing. Please try again.');
+      setProcessing(false);
+      return;
+    }
+
+    if (!orderId) {
+      const errorMsg = '❌ Missing order ID for form submission';
+      console.error(errorMsg);
+      showError('Order ID missing. Please try again.');
+      setProcessing(false);
+      return;
+    }
+
+    // Validate token is production token (not sandbox)
+    if (sessionId.includes('test') || sessionId.includes('sandbox')) {
+      console.warn('⚠️ Warning: Token appears to be from sandbox/test mode');
+    }
+
+    console.log('✅ Validation passed, creating form...');
 
     // Create a form element
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = 'https://www.cashfree.com/checkout/post/submit';
+    form.style.display = 'none';
 
-    // Add order token field
-    const tokenInput = document.createElement('input');
-    tokenInput.type = 'hidden';
-    tokenInput.name = 'orderToken';
-    tokenInput.value = sessionId;
-    form.appendChild(tokenInput);
+    // Helper function to add form field
+    const addField = (name: string, value: string) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+      console.log(`📋 Added field: ${name} = ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`);
+    };
 
-    // Add return URL
-    const returnUrlInput = document.createElement('input');
-    returnUrlInput.type = 'hidden';
-    returnUrlInput.name = 'returnUrl';
-    returnUrlInput.value = `${window.location.origin}/payment-success?order_id=${orderId}`;
-    form.appendChild(returnUrlInput);
+    // Add required fields for Cashfree hosted checkout
+    addField('orderId', orderId);
+    addField('orderAmount', total.toString());
+    addField('token', sessionId);
+    addField('customerEmail', billingDetails.email);
+    addField('customerPhone', billingDetails.phone);
+    addField('customerName', billingDetails.name);
+    addField('returnUrl', `${window.location.origin}/payment-success?order_id=${orderId}`);
 
     // Append to body and submit
     document.body.appendChild(form);
-    console.log('📤 Submitting form to Cashfree hosted checkout');
-    form.submit();
+
+    console.log('🚀 Form created and ready to submit');
+    console.log('📋 Form action:', form.action);
+    console.log('📋 Form method:', form.method);
+    console.log('📋 Total fields:', form.elements.length);
+
+    // Add a small delay to ensure form is fully rendered
+    setTimeout(() => {
+      console.log('📤 Submitting form to Cashfree hosted checkout NOW');
+      try {
+        form.submit();
+        console.log('✅ Form submitted successfully - redirecting to Cashfree...');
+      } catch (submitError) {
+        console.error('❌ Form submission failed:', submitError);
+        showError('Failed to redirect to payment page. Please try again.');
+        setProcessing(false);
+        document.body.removeChild(form);
+      }
+    }, 100);
   };
 
   /**
@@ -418,7 +473,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       console.log('📝 Falling back to form-based redirect');
     }
 
-    submitToHostedCheckout(sessionId, orderId);
+    submitToHostedCheckout(cashfreeOrder);
   };
 
   /**
@@ -496,17 +551,20 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
       // Step 2: Create fresh order token
       const cashfreeOrder = await createFreshOrderToken();
-      
+
       if (!cashfreeOrder) {
         // Demo mode already handled
         return;
       }
 
+      // Store order for potential retry
+      setLastCashfreeOrder(cashfreeOrder);
+
       // Step 3: Update order with Cashfree details
       if (savedOrder && import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
         await supabase
           .from('orders')
-          .update({ 
+          .update({
             payment_status: 'pending',
             payment_intent_id: cashfreeOrder.order_id,
             updated_at: new Date().toISOString()
@@ -517,13 +575,23 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       // Step 4: Clear cart before opening payment
       localStorage.removeItem('courseCart');
 
-      // Step 5: Open Cashfree payment - popup with redirect fallback
+      // Step 5: Open Cashfree payment - form-based redirect
       await openCashfreePayment(cashfreeOrder);
 
     } catch (error) {
       console.error('❌ Payment error:', error);
-      showError(`Payment failed: ${error.message || 'Unknown error occurred'}. Please try again.`);
+      showError(`Payment failed: ${error.message || 'Unknown error occurred'}. Please try again.`, true);
       setProcessing(false);
+    }
+  };
+
+  // Retry payment with existing order
+  const retryPayment = () => {
+    if (lastCashfreeOrder) {
+      console.log('🔄 Retrying payment with existing order...');
+      setErrorMessage(null);
+      setProcessing(true);
+      openCashfreePayment(lastCashfreeOrder);
     }
   };
 
@@ -776,7 +844,23 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
               </svg>
             </div>
             <div className="ml-3 flex-1">
-              <p className="text-sm font-medium">{errorMessage}</p>
+              <p className="text-sm font-medium mb-2">{errorMessage}</p>
+              {lastCashfreeOrder && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={retryPayment}
+                    className="text-xs bg-white text-red-600 px-3 py-1 rounded hover:bg-gray-100 font-semibold"
+                  >
+                    Retry Payment
+                  </button>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="text-xs bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 border border-white font-semibold"
+                  >
+                    Refresh Page
+                  </button>
+                </div>
+              )}
             </div>
             <button
               onClick={() => setErrorMessage(null)}
