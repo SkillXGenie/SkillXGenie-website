@@ -53,6 +53,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   const [processing, setProcessing] = useState(false);
   const [cashfreeSDK, setCashfreeSDK] = useState<any>(null);
   const [sdkLoading, setSdkLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [billingDetails, setBillingDetails] = useState({
     name: user?.user_metadata?.name || '',
     email: user?.email || '',
@@ -65,6 +66,12 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       country: 'IN'
     }
   });
+
+  // Show error toast
+  const showError = (message: string) => {
+    setErrorMessage(message);
+    setTimeout(() => setErrorMessage(null), 5000);
+  };
 
   // Initialize Cashfree SDK on component mount
   useEffect(() => {
@@ -292,7 +299,38 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   };
 
   /**
-   * Open Cashfree payment with popup mode and redirect fallback
+   * Submit form to Cashfree hosted checkout page
+   */
+  const submitToHostedCheckout = (sessionId: string, orderId: string) => {
+    console.log('📝 Creating form for hosted checkout...');
+
+    // Create a form element
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'https://www.cashfree.com/checkout/post/submit';
+
+    // Add order token field
+    const tokenInput = document.createElement('input');
+    tokenInput.type = 'hidden';
+    tokenInput.name = 'orderToken';
+    tokenInput.value = sessionId;
+    form.appendChild(tokenInput);
+
+    // Add return URL
+    const returnUrlInput = document.createElement('input');
+    returnUrlInput.type = 'hidden';
+    returnUrlInput.name = 'returnUrl';
+    returnUrlInput.value = `${window.location.origin}/payment-success?order_id=${orderId}`;
+    form.appendChild(returnUrlInput);
+
+    // Append to body and submit
+    document.body.appendChild(form);
+    console.log('📤 Submitting form to Cashfree hosted checkout');
+    form.submit();
+  };
+
+  /**
+   * Open Cashfree payment with popup mode and form fallback
    */
   const openCashfreePayment = async (cashfreeOrder: any) => {
     const sessionId = cashfreeOrder.payment_session_id || cashfreeOrder.order_token;
@@ -301,6 +339,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     console.log('\n=== CASHFREE PAYMENT INITIATION ===');
     console.log('📋 Order ID:', orderId);
     console.log('📋 Session ID:', sessionId);
+    console.log('📋 Full order data:', cashfreeOrder);
     console.log('📋 SDK Available:', !!cashfreeSDK);
     console.log('📋 SDK.checkout method:', typeof cashfreeSDK?.checkout);
 
@@ -320,10 +359,10 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
     // Try popup mode first
     if (cashfreeSDK && typeof cashfreeSDK.checkout === 'function') {
-      console.log('💳 Attempting popup mode...');
+      console.log('💳 Attempting popup mode with SDK...');
 
       try {
-        cashfreeSDK.checkout({
+        const checkoutResult = cashfreeSDK.checkout({
           ...paymentOptions,
           onSuccess: (data: any) => {
             console.log('✅ Payment Success:', data);
@@ -333,7 +372,10 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
           onFailure: (data: any) => {
             console.error('❌ Payment Failed:', data);
             setProcessing(false);
-            alert('Payment failed. Please try again.');
+
+            // Show user-friendly error
+            const errorMsg = data?.message || 'Payment failed. Please try again.';
+            showError(errorMsg);
           },
           onClose: () => {
             console.log('🔒 Payment popup closed by user');
@@ -341,27 +383,34 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
           }
         });
 
-        console.log('✅ Cashfree.checkout() called successfully');
+        console.log('✅ Cashfree.checkout() called, result:', checkoutResult);
+
+        // Wait a moment to see if popup opens
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // If checkout returned false or popup didn't open, fallback to hosted page
+        if (checkoutResult === false && processing) {
+          console.warn('⚠️ Popup failed to open, using form fallback');
+          throw new Error('Popup blocked or failed');
+        }
 
       } catch (popupError: any) {
         console.error('❌ Popup failed:', popupError);
-        console.log('🔄 Falling back to redirect mode...');
+        console.log('🔄 Falling back to hosted checkout page...');
 
-        // Notify user we're redirecting
-        alert('Opening payment page. If it doesn\'t open, please check your popup blocker.');
+        // Show user-friendly message (no alert needed, form submits immediately)
 
-        // Fallback to hosted checkout page
-        const redirectUrl = `https://payments.cashfree.com/order/#${sessionId}`;
-        console.log('🔗 Redirecting to:', redirectUrl);
-        window.location.href = redirectUrl;
+        // Use form-based fallback
+        submitToHostedCheckout(sessionId, orderId);
       }
     } else {
-      console.warn('⚠️ SDK.checkout not available, using redirect mode');
+      console.warn('⚠️ SDK not available, using hosted checkout directly');
 
-      // Direct redirect to Cashfree hosted checkout
-      const redirectUrl = `https://payments.cashfree.com/order/#${sessionId}`;
-      console.log('🔗 Redirecting to:', redirectUrl);
-      window.location.href = redirectUrl;
+      // Show user-friendly message
+      alert('Redirecting to secure payment page...');
+
+      // Direct form submission to hosted checkout
+      submitToHostedCheckout(sessionId, orderId);
     }
   };
 
@@ -378,18 +427,12 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
     // Validate form data
     if (!billingDetails.name || !billingDetails.email || !billingDetails.phone) {
-      alert('Please fill in all required fields');
+      showError('Please fill in all required fields');
       return;
     }
 
     if (!billingDetails.address.line1 || !billingDetails.address.city || !billingDetails.address.state) {
-      alert('Please fill in all address fields');
-      return;
-    }
-
-    // Check if SDK is ready
-    if (!cashfreeSDK) {
-      alert('Payment system not ready. Please wait a moment and try again.');
+      showError('Please fill in all address fields');
       return;
     }
 
@@ -472,7 +515,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
     } catch (error) {
       console.error('❌ Payment error:', error);
-      alert(`Payment failed: ${error.message || 'Unknown error occurred'}. Please try again.`);
+      showError(`Payment failed: ${error.message || 'Unknown error occurred'}. Please try again.`);
       setProcessing(false);
     }
   };
@@ -710,6 +753,36 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
           ✅ Production Payment Gateway - Real transactions
         </p>
       </div>
+
+      {/* Error Toast */}
+      {errorMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 50 }}
+          className="fixed bottom-4 right-4 bg-red-500 text-white px-6 py-4 rounded-lg shadow-lg max-w-md z-50"
+        >
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-sm font-medium">{errorMessage}</p>
+            </div>
+            <button
+              onClick={() => setErrorMessage(null)}
+              className="ml-4 flex-shrink-0 inline-flex text-white hover:text-gray-200"
+            >
+              <span className="sr-only">Close</span>
+              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </motion.div>
+      )}
     </form>
   );
 };
