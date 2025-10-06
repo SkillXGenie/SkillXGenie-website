@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabaseClient';
-import { 
-  ArrowLeft, 
-  IndianRupee, 
-  CreditCard, 
-  Shield, 
+import { load } from 'cashfree-pg-sdk-javascript';
+import {
+  ArrowLeft,
+  IndianRupee,
+  CreditCard,
+  Shield,
   CheckCircle,
   Lock,
   User,
@@ -27,11 +28,9 @@ interface Course {
   emoji: string;
 }
 
-// Declare Cashfree global type
-declare global {
-  interface Window {
-    Cashfree: any;
-  }
+// Cashfree SDK types
+interface CashfreeInstance {
+  checkout: (options: any) => Promise<any>;
 }
 
 const courses: Course[] = [
@@ -51,7 +50,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 }) => {
   // State management
   const [processing, setProcessing] = useState(false);
-  const [cashfreeSDK, setCashfreeSDK] = useState<any>(null);
+  const [cashfreeSDK, setCashfreeSDK] = useState<CashfreeInstance | null>(null);
   const [sdkLoading, setSdkLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastCashfreeOrder, setLastCashfreeOrder] = useState<any>(null);
@@ -79,11 +78,33 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     }
   };
 
-  // Check environment and network connectivity on mount
+  // Load Cashfree SDK and check environment
   useEffect(() => {
+    initializeCashfreeSDK();
     checkEnvironmentAndNetwork();
-    setSdkLoading(false);
   }, []);
+
+  /**
+   * Initialize Cashfree SDK - Latest Drop-in Integration
+   */
+  const initializeCashfreeSDK = async () => {
+    try {
+      console.log('🔄 Loading Cashfree SDK...');
+
+      // Load SDK for production mode
+      const cashfree = await load({
+        mode: 'production'
+      });
+
+      setCashfreeSDK(cashfree);
+      setSdkLoading(false);
+      console.log('✅ Cashfree SDK loaded successfully');
+    } catch (error) {
+      console.error('❌ Failed to load Cashfree SDK:', error);
+      showError('Failed to initialize payment gateway. Please refresh the page.');
+      setSdkLoading(false);
+    }
+  };
 
   /**
    * Check environment requirements and network connectivity
@@ -150,102 +171,6 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     console.log('=== DIAGNOSTICS COMPLETE ===\n');
   };
 
-  /**
-   * Load Cashfree SDK script dynamically and return a Promise
-   * @returns Promise that resolves when SDK is loaded
-   */
-  const loadCashfreeSDKScript = (): Promise<any> => {
-    return new Promise((resolve, reject) => {
-      // Check if Cashfree is already loaded
-      if (window.Cashfree) {
-        console.log('✅ Cashfree SDK already available on window');
-        resolve(window.Cashfree);
-        return;
-      }
-
-      // Check if script is already being loaded
-      const existingScript = document.querySelector('script[src*="cashfree.com"]');
-      if (existingScript) {
-        console.log('⏳ Cashfree script already in DOM, waiting for it to load...');
-        // Wait for the existing script to load
-        const checkExisting = setInterval(() => {
-          if (window.Cashfree) {
-            clearInterval(checkExisting);
-            resolve(window.Cashfree);
-          }
-        }, 100);
-
-        // Timeout after 10 seconds
-        setTimeout(() => {
-          clearInterval(checkExisting);
-          if (!window.Cashfree) {
-            reject(new Error('Cashfree SDK script timeout'));
-          }
-        }, 10000);
-        return;
-      }
-
-      console.log('🔄 Loading Cashfree SDK script...');
-
-      // Create and load the SDK script
-      const script = document.createElement('script');
-      script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
-      script.type = 'text/javascript';
-      script.async = true;
-
-      script.onload = () => {
-        console.log('✅ Cashfree script loaded successfully');
-
-        // Verify that window.Cashfree is now available
-        if (window.Cashfree) {
-          resolve(window.Cashfree);
-        } else {
-          reject(new Error('Cashfree SDK loaded but window.Cashfree is undefined'));
-        }
-      };
-
-      script.onerror = (error) => {
-        console.error('❌ Failed to load Cashfree SDK script:', error);
-        reject(new Error('Failed to load Cashfree SDK script'));
-      };
-
-      document.head.appendChild(script);
-    });
-  };
-
-  /**
-   * Initialize Cashfree SDK in production mode
-   * SDK is optional - we have form fallback if SDK fails
-   */
-  const initializeCashfreeSDK = async () => {
-    setSdkLoading(true);
-
-    try {
-      console.log('🔄 Attempting to initialize Cashfree SDK (optional)...');
-
-      // Load the SDK script
-      const CashfreeLib = await loadCashfreeSDKScript();
-
-      if (!CashfreeLib) {
-        console.warn('⚠️ Cashfree SDK not available - will use form fallback');
-        setSdkLoading(false);
-        return;
-      }
-
-      console.log('✅ Cashfree SDK loaded, initializing...');
-
-      // Initialize Cashfree with production mode
-      const cashfreeInstance = CashfreeLib({ mode: "production" });
-
-      setCashfreeSDK(cashfreeInstance);
-      setSdkLoading(false);
-      console.log('✅ Cashfree SDK ready (popup mode available)');
-
-    } catch (error: any) {
-      console.warn('⚠️ Cashfree SDK initialization failed - will use form fallback:', error);
-      setSdkLoading(false);
-    }
-  };
 
   /**
    * Calculate pricing with GST
@@ -374,51 +299,43 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   };
 
   /**
-   * Submit form to Cashfree hosted checkout page with retry logic
-   * This is the proper way to redirect to Cashfree's hosted payment page
+   * Modern SDK-based checkout - Uses latest Cashfree Drop-in
+   * Replaces deprecated form POST method
    */
   const submitToHostedCheckout = async (cashfreeOrder: any, attempt: number = 1) => {
     const MAX_RETRIES = 2;
-    const RETRY_DELAY = 2000; // 2 seconds
+    const RETRY_DELAY = 2000;
 
-    console.log(`📝 Creating form for hosted checkout (Attempt ${attempt}/${MAX_RETRIES + 1})...`);
+    console.log(`🚀 Initiating Cashfree SDK checkout (Attempt ${attempt}/${MAX_RETRIES + 1})...`);
     console.log('📋 Order data:', cashfreeOrder);
 
     const sessionId = cashfreeOrder.payment_session_id || cashfreeOrder.order_token;
     const orderId = cashfreeOrder.order_id;
-    const appId = cashfreeOrder.app_id;
-
-    // CRITICAL: Validate appId first
-    if (!appId) {
-      const errorMsg = '❌ CRITICAL: appId is missing from backend response';
-      console.error(errorMsg);
-      console.error('📋 Order data received:', JSON.stringify(cashfreeOrder, null, 2));
-      showError('Payment configuration error. Please contact support.');
-      setProcessing(false);
-      setShowFallbackOptions(true);
-      return;
-    }
-
-    console.log('🔑 App ID received:', appId.substring(0, 10) + '...' + appId.substring(appId.length - 4));
 
     // Validate required data
     if (!sessionId) {
-      const errorMsg = '❌ Missing order token for form submission';
-      console.error(errorMsg);
-      showError('Payment token missing. Please try again.');
+      console.error('❌ Missing payment session ID');
+      showError('Payment session missing. Please try again.');
       setProcessing(false);
       return;
     }
 
     if (!orderId) {
-      const errorMsg = '❌ Missing order ID for form submission';
-      console.error(errorMsg);
+      console.error('❌ Missing order ID');
       showError('Order ID missing. Please try again.');
       setProcessing(false);
       return;
     }
 
-    // Check network connectivity before attempting
+    // Check SDK is loaded
+    if (!cashfreeSDK) {
+      console.error('❌ Cashfree SDK not loaded');
+      showError('Payment gateway not initialized. Please refresh the page.');
+      setProcessing(false);
+      return;
+    }
+
+    // Check network connectivity
     if (!navigator.onLine) {
       console.error('❌ No internet connection detected');
       showError('No internet connection. Please check your network and try again.', true);
@@ -427,121 +344,51 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       return;
     }
 
-    // Validate token is production token (not sandbox)
-    if (sessionId.includes('test') || sessionId.includes('sandbox')) {
-      console.warn('⚠️ Warning: Token appears to be from sandbox/test mode');
-    }
+    console.log('✅ Validation passed, launching checkout...');
 
-    console.log('✅ Validation passed, creating form...');
+    try {
+      // Configure checkout options for modern SDK
+      const checkoutOptions = {
+        paymentSessionId: sessionId,
+        returnUrl: `${window.location.origin}/payment-success?order_id=${orderId}`,
+        redirectTarget: '_self'
+      };
 
-    // Create a form element
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = 'https://www.cashfree.com/checkout/post/submit';
-    form.target = '_self';
-    form.style.display = 'none';
+      console.log('💳 Launching Cashfree Drop-in checkout...');
+      console.log('📋 Session ID:', sessionId.substring(0, 20) + '...');
 
-    // Helper function to add form field
-    const addField = (name: string, value: string) => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = name;
-      input.value = value;
-      form.appendChild(input);
-      console.log(`📋 Added field: ${name} = ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`);
-    };
+      // Use the modern SDK checkout method
+      const result = await cashfreeSDK.checkout(checkoutOptions);
 
-    // Add required fields for Cashfree hosted checkout
-    // CRITICAL: appId must be the first field
-    addField('appId', appId);
-    addField('orderId', orderId);
-    addField('orderAmount', total.toString());
-    addField('token', sessionId);
-    addField('customerEmail', billingDetails.email);
-    addField('customerPhone', billingDetails.phone);
-    addField('customerName', billingDetails.name);
-    addField('returnUrl', `${window.location.origin}/payment-success?order_id=${orderId}`);
+      console.log('✅ Checkout initiated:', result);
 
-    // Append to body
-    document.body.appendChild(form);
+      // The SDK will handle the redirect automatically
+      // If it doesn't redirect, the user will be returned to this page
 
-    console.log('🚀 Form created and ready to submit');
-    console.log('📋 Form action:', form.action);
-    console.log('📋 Form method:', form.method);
-    console.log('📋 Form target:', form.target);
-    console.log('📋 Total fields:', form.elements.length);
+    } catch (error: any) {
+      console.error('❌ Checkout error:', error);
 
-    // Track if page actually navigates
-    let pageNavigated = false;
-    const navigationHandler = () => {
-      pageNavigated = true;
-      console.log('✅ Page navigation detected - form submission successful');
-    };
-    window.addEventListener('beforeunload', navigationHandler);
+      // Retry logic
+      if (attempt <= MAX_RETRIES) {
+        console.log(`🔄 Retrying in ${RETRY_DELAY/1000} seconds... (${attempt}/${MAX_RETRIES})`);
+        setRetryCount(attempt);
+        showError(`Connection issue. Retrying (${attempt}/${MAX_RETRIES})...`, false);
 
-    // Submit form
-    setTimeout(async () => {
-      console.log('📤 Submitting form to Cashfree hosted checkout NOW');
-      try {
-        form.submit();
-        console.log('✅ Form.submit() executed');
-
-        // Wait to see if page navigates
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        window.removeEventListener('beforeunload', navigationHandler);
-
-        if (!pageNavigated) {
-          console.warn('⚠️ Form submitted but page did not navigate');
-
-          // Check if we should retry
-          if (attempt <= MAX_RETRIES) {
-            console.log(`🔄 Retrying in ${RETRY_DELAY/1000} seconds...`);
-            setRetryCount(attempt);
-            showError(`Connection issue. Retrying (${attempt}/${MAX_RETRIES})...`, false);
-
-            document.body.removeChild(form);
-
-            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-            return submitToHostedCheckout(cashfreeOrder, attempt + 1);
-          } else {
-            console.error('❌ Max retries reached. Payment gateway not responding.');
-            document.body.removeChild(form);
-            setNetworkIssue(true);
-            setShowFallbackOptions(true);
-            showError('Payment gateway not responding. Please try alternative options below.', true);
-            setProcessing(false);
-          }
-        }
-
-      } catch (submitError: any) {
-        console.error('❌ Form submission exception:', submitError);
-        window.removeEventListener('beforeunload', navigationHandler);
-
-        if (attempt <= MAX_RETRIES) {
-          console.log(`🔄 Retrying after error in ${RETRY_DELAY/1000} seconds...`);
-          setRetryCount(attempt);
-          showError(`Error occurred. Retrying (${attempt}/${MAX_RETRIES})...`, false);
-
-          document.body.removeChild(form);
-
-          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-          return submitToHostedCheckout(cashfreeOrder, attempt + 1);
-        } else {
-          console.error('❌ Max retries reached after errors');
-          document.body.removeChild(form);
-          setNetworkIssue(true);
-          setShowFallbackOptions(true);
-          showError('Unable to connect to payment gateway. Please see options below.', true);
-          setProcessing(false);
-        }
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        return submitToHostedCheckout(cashfreeOrder, attempt + 1);
+      } else {
+        console.error('❌ Max retries reached');
+        setNetworkIssue(true);
+        setShowFallbackOptions(true);
+        showError('Unable to connect to payment gateway. Please try again later or contact support.', true);
+        setProcessing(false);
       }
-    }, 100);
+    }
   };
 
   /**
-   * Open Cashfree payment with form-based redirect
-   * SDK is optional and will fallback to form immediately if it fails
+   * Open Cashfree payment using modern SDK
+   * Initiates the checkout flow with the latest Cashfree Drop-in
    */
   const openCashfreePayment = async (cashfreeOrder: any) => {
     const sessionId = cashfreeOrder.payment_session_id || cashfreeOrder.order_token;
@@ -558,69 +405,8 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       throw new Error('No payment session ID received from backend');
     }
 
-    // IMPORTANT: To avoid CORS issues, we primarily use form-based redirect
-    // The SDK might try to call api.cashfree.com which causes CORS errors
-
-    let sdkAttempted = false;
-
-    // Only try SDK if available (with quick timeout to avoid delays)
-    if (cashfreeSDK && typeof cashfreeSDK.checkout === 'function') {
-      console.log('💳 SDK available - attempting popup (2s timeout)...');
-
-      try {
-        sdkAttempted = true;
-
-        const sdkPromise = new Promise<void>((resolve, reject) => {
-          try {
-            cashfreeSDK.checkout({
-              paymentSessionId: sessionId,
-              returnUrl: `${window.location.origin}/payment-success?order_id=${orderId}`,
-              onSuccess: (data: any) => {
-                console.log('✅ Payment Success:', data);
-                setProcessing(false);
-                window.location.href = `${window.location.origin}/payment-success?order_id=${orderId}&status=success`;
-                resolve();
-              },
-              onFailure: (data: any) => {
-                console.error('❌ Payment Failed:', data);
-                setProcessing(false);
-                showError(data?.message || 'Payment failed');
-                reject(new Error('Payment failed'));
-              },
-              onClose: () => {
-                console.log('🔒 Popup closed by user');
-                setProcessing(false);
-                reject(new Error('Popup closed'));
-              }
-            });
-          } catch (err) {
-            reject(err);
-          }
-        });
-
-        // 2 second timeout for SDK popup
-        const timeoutPromise = new Promise<void>((_, reject) =>
-          setTimeout(() => reject(new Error('SDK timeout')), 2000)
-        );
-
-        await Promise.race([sdkPromise, timeoutPromise]);
-        console.log('✅ SDK popup opened');
-        return; // Success, exit here
-
-      } catch (sdkError: any) {
-        console.warn('⚠️ SDK failed:', sdkError.message);
-        // Continue to form fallback
-      }
-    }
-
-    // Form-based redirect (primary/fallback method)
-    if (!sdkAttempted) {
-      console.log('📝 Using form-based redirect (avoiding CORS)');
-    } else {
-      console.log('📝 Falling back to form-based redirect');
-    }
-
-    submitToHostedCheckout(cashfreeOrder);
+    // Use the modern SDK checkout method
+    await submitToHostedCheckout(cashfreeOrder);
   };
 
   /**
