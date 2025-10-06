@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabaseClient';
-import { load } from 'cashfree-pg-sdk-javascript';
 import {
   ArrowLeft,
   IndianRupee,
@@ -26,6 +25,13 @@ interface Course {
   id: string;
   title: string;
   emoji: string;
+}
+
+// Declare Cashfree global type
+declare global {
+  interface Window {
+    Cashfree?: any;
+  }
 }
 
 // Cashfree SDK types
@@ -80,29 +86,65 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
   // Load Cashfree SDK and check environment
   useEffect(() => {
-    initializeCashfreeSDK();
+    // Small delay to ensure SDK script is loaded
+    const initTimer = setTimeout(() => {
+      initializeCashfreeSDK();
+    }, 100);
+
     checkEnvironmentAndNetwork();
+
+    return () => clearTimeout(initTimer);
   }, []);
 
   /**
    * Initialize Cashfree SDK - Latest Drop-in Integration
    */
-  const initializeCashfreeSDK = async () => {
-    try {
-      console.log('🔄 Loading Cashfree SDK...');
+  const initializeCashfreeSDK = async (retryCount = 0) => {
+    const MAX_RETRIES = 3;
 
-      // Load SDK for production mode
-      const cashfree = await load({
+    try {
+      console.log(`🔄 Initializing Cashfree SDK (attempt ${retryCount + 1}/${MAX_RETRIES + 1})...`);
+
+      // Check if Cashfree is loaded from CDN
+      if (!window.Cashfree) {
+        console.warn('⚠️ Cashfree SDK not yet available on window object');
+
+        // Retry with exponential backoff
+        if (retryCount < MAX_RETRIES) {
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Max 3s
+          console.log(`🔄 Retrying in ${delay}ms...`);
+          setTimeout(() => initializeCashfreeSDK(retryCount + 1), delay);
+          return;
+        } else {
+          console.error('❌ Cashfree SDK failed to load after multiple retries');
+          setSdkLoading(false);
+          showError('Payment gateway failed to load. Please refresh the page.');
+          return;
+        }
+      }
+
+      console.log('✅ Cashfree SDK found on window');
+
+      // Initialize Cashfree with production mode
+      const cashfree = await window.Cashfree({
         mode: 'production'
       });
 
       setCashfreeSDK(cashfree);
       setSdkLoading(false);
-      console.log('✅ Cashfree SDK loaded successfully');
+      console.log('✅ Cashfree SDK initialized successfully');
     } catch (error) {
-      console.error('❌ Failed to load Cashfree SDK:', error);
-      showError('Failed to initialize payment gateway. Please refresh the page.');
-      setSdkLoading(false);
+      console.error('❌ Failed to initialize Cashfree SDK:', error);
+
+      // Retry on error
+      if (retryCount < MAX_RETRIES) {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 3000);
+        console.log(`🔄 Retrying after error in ${delay}ms...`);
+        setTimeout(() => initializeCashfreeSDK(retryCount + 1), delay);
+      } else {
+        showError('Failed to initialize payment gateway. Please refresh the page.');
+        setSdkLoading(false);
+      }
     }
   };
 
