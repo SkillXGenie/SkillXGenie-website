@@ -74,8 +74,13 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   };
 
   // Initialize Cashfree SDK on component mount
+  // NOTE: SDK is disabled to avoid CORS issues with api.cashfree.com
+  // We use form-based redirect as the primary payment method
   useEffect(() => {
-    initializeCashfreeSDK();
+    // Disable SDK initialization - use form redirect instead
+    // initializeCashfreeSDK();
+    setSdkLoading(false); // Mark as ready immediately
+    console.log('💳 Using form-based payment (SDK disabled to avoid CORS)');
   }, []);
 
   /**
@@ -143,31 +148,34 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
   /**
    * Initialize Cashfree SDK in production mode
+   * SDK is optional - we have form fallback if SDK fails
    */
   const initializeCashfreeSDK = async () => {
     setSdkLoading(true);
 
     try {
-      console.log('🔄 Initializing Cashfree SDK...');
+      console.log('🔄 Attempting to initialize Cashfree SDK (optional)...');
 
       // Load the SDK script
       const CashfreeLib = await loadCashfreeSDKScript();
 
       if (!CashfreeLib) {
-        throw new Error('Cashfree SDK not loaded');
+        console.warn('⚠️ Cashfree SDK not available - will use form fallback');
+        setSdkLoading(false);
+        return;
       }
 
-      console.log('✅ Cashfree loaded, initializing with mode: production');
+      console.log('✅ Cashfree SDK loaded, initializing...');
 
       // Initialize Cashfree with production mode
       const cashfreeInstance = CashfreeLib({ mode: "production" });
 
       setCashfreeSDK(cashfreeInstance);
       setSdkLoading(false);
-      console.log('✅ Cashfree SDK initialized successfully');
+      console.log('✅ Cashfree SDK ready (popup mode available)');
 
     } catch (error: any) {
-      console.error('❌ Failed to initialize Cashfree SDK:', error);
+      console.warn('⚠️ Cashfree SDK initialization failed - will use form fallback:', error);
       setSdkLoading(false);
     }
   };
@@ -330,7 +338,8 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   };
 
   /**
-   * Open Cashfree payment with popup mode and form fallback
+   * Open Cashfree payment with form-based redirect
+   * SDK is optional and will fallback to form immediately if it fails
    */
   const openCashfreePayment = async (cashfreeOrder: any) => {
     const sessionId = cashfreeOrder.payment_session_id || cashfreeOrder.order_token;
@@ -339,9 +348,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     console.log('\n=== CASHFREE PAYMENT INITIATION ===');
     console.log('📋 Order ID:', orderId);
     console.log('📋 Session ID:', sessionId);
-    console.log('📋 Full order data:', cashfreeOrder);
     console.log('📋 SDK Available:', !!cashfreeSDK);
-    console.log('📋 SDK.checkout method:', typeof cashfreeSDK?.checkout);
 
     // Validate session ID
     if (!sessionId) {
@@ -349,69 +356,69 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       throw new Error('No payment session ID received from backend');
     }
 
-    // Build payment options
-    const paymentOptions = {
-      paymentSessionId: sessionId,
-      returnUrl: `${window.location.origin}/payment-success?order_id=${orderId}`,
-    };
+    // IMPORTANT: To avoid CORS issues, we primarily use form-based redirect
+    // The SDK might try to call api.cashfree.com which causes CORS errors
 
-    console.log('📋 Payment options:', JSON.stringify(paymentOptions, null, 2));
+    let sdkAttempted = false;
 
-    // Try popup mode first
+    // Only try SDK if available (with quick timeout to avoid delays)
     if (cashfreeSDK && typeof cashfreeSDK.checkout === 'function') {
-      console.log('💳 Attempting popup mode with SDK...');
+      console.log('💳 SDK available - attempting popup (2s timeout)...');
 
       try {
-        const checkoutResult = cashfreeSDK.checkout({
-          ...paymentOptions,
-          onSuccess: (data: any) => {
-            console.log('✅ Payment Success:', data);
-            setProcessing(false);
-            window.location.href = `${window.location.origin}/payment-success?order_id=${orderId}&status=success`;
-          },
-          onFailure: (data: any) => {
-            console.error('❌ Payment Failed:', data);
-            setProcessing(false);
+        sdkAttempted = true;
 
-            // Show user-friendly error
-            const errorMsg = data?.message || 'Payment failed. Please try again.';
-            showError(errorMsg);
-          },
-          onClose: () => {
-            console.log('🔒 Payment popup closed by user');
-            setProcessing(false);
+        const sdkPromise = new Promise<void>((resolve, reject) => {
+          try {
+            cashfreeSDK.checkout({
+              paymentSessionId: sessionId,
+              returnUrl: `${window.location.origin}/payment-success?order_id=${orderId}`,
+              onSuccess: (data: any) => {
+                console.log('✅ Payment Success:', data);
+                setProcessing(false);
+                window.location.href = `${window.location.origin}/payment-success?order_id=${orderId}&status=success`;
+                resolve();
+              },
+              onFailure: (data: any) => {
+                console.error('❌ Payment Failed:', data);
+                setProcessing(false);
+                showError(data?.message || 'Payment failed');
+                reject(new Error('Payment failed'));
+              },
+              onClose: () => {
+                console.log('🔒 Popup closed by user');
+                setProcessing(false);
+                reject(new Error('Popup closed'));
+              }
+            });
+          } catch (err) {
+            reject(err);
           }
         });
 
-        console.log('✅ Cashfree.checkout() called, result:', checkoutResult);
+        // 2 second timeout for SDK popup
+        const timeoutPromise = new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('SDK timeout')), 2000)
+        );
 
-        // Wait a moment to see if popup opens
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await Promise.race([sdkPromise, timeoutPromise]);
+        console.log('✅ SDK popup opened');
+        return; // Success, exit here
 
-        // If checkout returned false or popup didn't open, fallback to hosted page
-        if (checkoutResult === false && processing) {
-          console.warn('⚠️ Popup failed to open, using form fallback');
-          throw new Error('Popup blocked or failed');
-        }
-
-      } catch (popupError: any) {
-        console.error('❌ Popup failed:', popupError);
-        console.log('🔄 Falling back to hosted checkout page...');
-
-        // Show user-friendly message (no alert needed, form submits immediately)
-
-        // Use form-based fallback
-        submitToHostedCheckout(sessionId, orderId);
+      } catch (sdkError: any) {
+        console.warn('⚠️ SDK failed:', sdkError.message);
+        // Continue to form fallback
       }
-    } else {
-      console.warn('⚠️ SDK not available, using hosted checkout directly');
-
-      // Show user-friendly message
-      alert('Redirecting to secure payment page...');
-
-      // Direct form submission to hosted checkout
-      submitToHostedCheckout(sessionId, orderId);
     }
+
+    // Form-based redirect (primary/fallback method)
+    if (!sdkAttempted) {
+      console.log('📝 Using form-based redirect (avoiding CORS)');
+    } else {
+      console.log('📝 Falling back to form-based redirect');
+    }
+
+    submitToHostedCheckout(sessionId, orderId);
   };
 
   /**
