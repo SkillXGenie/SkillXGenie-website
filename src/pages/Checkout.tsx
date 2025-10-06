@@ -55,6 +55,9 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   const [sdkLoading, setSdkLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastCashfreeOrder, setLastCashfreeOrder] = useState<any>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [networkIssue, setNetworkIssue] = useState(false);
+  const [showFallbackOptions, setShowFallbackOptions] = useState(false);
   const [billingDetails, setBillingDetails] = useState({
     name: user?.user_metadata?.name || '',
     email: user?.email || '',
@@ -76,15 +79,76 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     }
   };
 
-  // Initialize Cashfree SDK on component mount
-  // NOTE: SDK is disabled to avoid CORS issues with api.cashfree.com
-  // We use form-based redirect as the primary payment method
+  // Check environment and network connectivity on mount
   useEffect(() => {
-    // Disable SDK initialization - use form redirect instead
-    // initializeCashfreeSDK();
-    setSdkLoading(false); // Mark as ready immediately
-    console.log('💳 Using form-based payment (SDK disabled to avoid CORS)');
+    checkEnvironmentAndNetwork();
+    setSdkLoading(false);
   }, []);
+
+  /**
+   * Check environment requirements and network connectivity
+   */
+  const checkEnvironmentAndNetwork = async () => {
+    console.log('\n=== ENVIRONMENT & NETWORK DIAGNOSTICS ===');
+
+    // Check 1: HTTPS requirement
+    const isHTTPS = window.location.protocol === 'https:';
+    console.log('🔒 HTTPS:', isHTTPS ? '✅ Enabled' : '❌ DISABLED (Required for Cashfree)');
+
+    if (!isHTTPS && window.location.hostname !== 'localhost') {
+      console.error('❌ CRITICAL: Cashfree requires HTTPS. Current protocol:', window.location.protocol);
+      showError('Payment gateway requires HTTPS. Please contact support.');
+    }
+
+    // Check 2: Browser information
+    console.log('🌐 Browser:', navigator.userAgent);
+    console.log('🌐 Online:', navigator.onLine ? '✅ Yes' : '❌ No');
+
+    // Check 3: Test Cashfree connectivity
+    try {
+      console.log('🔍 Testing Cashfree connectivity...');
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const response = await fetch('https://www.cashfree.com/robots.txt', {
+        method: 'GET',
+        mode: 'no-cors',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+      console.log('✅ Cashfree domain is reachable');
+      setNetworkIssue(false);
+
+    } catch (error: any) {
+      console.error('❌ Cashfree connectivity test failed:', error.message);
+      console.error('📋 Error details:', {
+        name: error.name,
+        message: error.message,
+        type: error.constructor.name
+      });
+
+      if (error.name === 'AbortError') {
+        console.error('⏰ Connection timeout - www.cashfree.com not responding');
+      } else {
+        console.error('🚫 Network error - www.cashfree.com may be blocked');
+      }
+
+      setNetworkIssue(true);
+    }
+
+    // Check 4: CSP headers
+    console.log('📋 Checking Content Security Policy...');
+    const metaCSP = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+    if (metaCSP) {
+      console.log('⚠️ CSP meta tag found:', metaCSP.getAttribute('content'));
+    } else {
+      console.log('✅ No CSP meta tag blocking');
+    }
+
+    console.log('=== DIAGNOSTICS COMPLETE ===\n');
+  };
 
   /**
    * Load Cashfree SDK script dynamically and return a Promise
@@ -310,11 +374,14 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
   };
 
   /**
-   * Submit form to Cashfree hosted checkout page
+   * Submit form to Cashfree hosted checkout page with retry logic
    * This is the proper way to redirect to Cashfree's hosted payment page
    */
-  const submitToHostedCheckout = (cashfreeOrder: any) => {
-    console.log('📝 Creating form for hosted checkout...');
+  const submitToHostedCheckout = async (cashfreeOrder: any, attempt: number = 1) => {
+    const MAX_RETRIES = 2;
+    const RETRY_DELAY = 2000; // 2 seconds
+
+    console.log(`📝 Creating form for hosted checkout (Attempt ${attempt}/${MAX_RETRIES + 1})...`);
     console.log('📋 Order data:', cashfreeOrder);
 
     const sessionId = cashfreeOrder.payment_session_id || cashfreeOrder.order_token;
@@ -337,6 +404,15 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       return;
     }
 
+    // Check network connectivity before attempting
+    if (!navigator.onLine) {
+      console.error('❌ No internet connection detected');
+      showError('No internet connection. Please check your network and try again.', true);
+      setProcessing(false);
+      setNetworkIssue(true);
+      return;
+    }
+
     // Validate token is production token (not sandbox)
     if (sessionId.includes('test') || sessionId.includes('sandbox')) {
       console.warn('⚠️ Warning: Token appears to be from sandbox/test mode');
@@ -348,6 +424,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = 'https://www.cashfree.com/checkout/post/submit';
+    form.target = '_self';
     form.style.display = 'none';
 
     // Helper function to add form field
@@ -369,25 +446,79 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
     addField('customerName', billingDetails.name);
     addField('returnUrl', `${window.location.origin}/payment-success?order_id=${orderId}`);
 
-    // Append to body and submit
+    // Append to body
     document.body.appendChild(form);
 
     console.log('🚀 Form created and ready to submit');
     console.log('📋 Form action:', form.action);
     console.log('📋 Form method:', form.method);
+    console.log('📋 Form target:', form.target);
     console.log('📋 Total fields:', form.elements.length);
 
-    // Add a small delay to ensure form is fully rendered
-    setTimeout(() => {
+    // Track if page actually navigates
+    let pageNavigated = false;
+    const navigationHandler = () => {
+      pageNavigated = true;
+      console.log('✅ Page navigation detected - form submission successful');
+    };
+    window.addEventListener('beforeunload', navigationHandler);
+
+    // Submit form
+    setTimeout(async () => {
       console.log('📤 Submitting form to Cashfree hosted checkout NOW');
       try {
         form.submit();
-        console.log('✅ Form submitted successfully - redirecting to Cashfree...');
-      } catch (submitError) {
-        console.error('❌ Form submission failed:', submitError);
-        showError('Failed to redirect to payment page. Please try again.');
-        setProcessing(false);
-        document.body.removeChild(form);
+        console.log('✅ Form.submit() executed');
+
+        // Wait to see if page navigates
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        window.removeEventListener('beforeunload', navigationHandler);
+
+        if (!pageNavigated) {
+          console.warn('⚠️ Form submitted but page did not navigate');
+
+          // Check if we should retry
+          if (attempt <= MAX_RETRIES) {
+            console.log(`🔄 Retrying in ${RETRY_DELAY/1000} seconds...`);
+            setRetryCount(attempt);
+            showError(`Connection issue. Retrying (${attempt}/${MAX_RETRIES})...`, false);
+
+            document.body.removeChild(form);
+
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            return submitToHostedCheckout(cashfreeOrder, attempt + 1);
+          } else {
+            console.error('❌ Max retries reached. Payment gateway not responding.');
+            document.body.removeChild(form);
+            setNetworkIssue(true);
+            setShowFallbackOptions(true);
+            showError('Payment gateway not responding. Please try alternative options below.', true);
+            setProcessing(false);
+          }
+        }
+
+      } catch (submitError: any) {
+        console.error('❌ Form submission exception:', submitError);
+        window.removeEventListener('beforeunload', navigationHandler);
+
+        if (attempt <= MAX_RETRIES) {
+          console.log(`🔄 Retrying after error in ${RETRY_DELAY/1000} seconds...`);
+          setRetryCount(attempt);
+          showError(`Error occurred. Retrying (${attempt}/${MAX_RETRIES})...`, false);
+
+          document.body.removeChild(form);
+
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+          return submitToHostedCheckout(cashfreeOrder, attempt + 1);
+        } else {
+          console.error('❌ Max retries reached after errors');
+          document.body.removeChild(form);
+          setNetworkIssue(true);
+          setShowFallbackOptions(true);
+          showError('Unable to connect to payment gateway. Please see options below.', true);
+          setProcessing(false);
+        }
       }
     }, 100);
   };
@@ -829,6 +960,95 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         </p>
       </div>
 
+      {/* Network Issue Warning */}
+      {networkIssue && (
+        <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <svg className="h-6 w-6 text-yellow-600 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-yellow-800 mb-1">Payment Gateway Connection Issue</h4>
+              <p className="text-sm text-yellow-700 mb-2">
+                Unable to reach www.cashfree.com. This could be due to:
+              </p>
+              <ul className="text-xs text-yellow-700 list-disc ml-4 space-y-1">
+                <li>Network connectivity issues</li>
+                <li>Firewall or security software blocking the connection</li>
+                <li>DNS resolution problems</li>
+                <li>Hosting provider restrictions</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fallback Options */}
+      {showFallbackOptions && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mt-6 bg-white border-2 border-blue-200 rounded-xl p-6 shadow-lg"
+        >
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <svg className="h-6 w-6 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Alternative Payment Options
+          </h3>
+
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-900 mb-2">📧 Email Support</h4>
+              <p className="text-sm text-gray-700 mb-2">
+                Contact our support team to complete your order manually.
+              </p>
+              <a
+                href={`mailto:support@skillxgenie.com?subject=Payment Issue - Order ${lastCashfreeOrder?.order_id || 'Pending'}&body=I'm having trouble completing payment for:\n\nOrder Total: ₹${total}\nCustomer Email: ${billingDetails.email}\nCustomer Phone: ${billingDetails.phone}\n\nPlease assist me with completing this order.`}
+                className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-semibold"
+              >
+                Email Support
+              </a>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-900 mb-2">📞 Phone Support</h4>
+              <p className="text-sm text-gray-700 mb-2">
+                Call us to complete your order over the phone.
+              </p>
+              <a
+                href="tel:+919876543210"
+                className="inline-block bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm font-semibold"
+              >
+                Call +91 98765 43210
+              </a>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-900 mb-2">🔄 Try Again Later</h4>
+              <p className="text-sm text-gray-700 mb-2">
+                The payment gateway may be temporarily unavailable. Your order details are saved.
+              </p>
+              <div className="text-xs text-gray-600 mt-2 bg-white p-2 rounded border border-gray-200">
+                <p className="font-semibold">Order Reference: {lastCashfreeOrder?.order_id || 'N/A'}</p>
+                <p>Total: ₹{total}</p>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+              <h4 className="font-semibold text-blue-900 mb-2">💡 Troubleshooting Tips</h4>
+              <ul className="text-sm text-blue-800 space-y-1 list-disc ml-4">
+                <li>Check your internet connection</li>
+                <li>Disable VPN or proxy if enabled</li>
+                <li>Try a different browser</li>
+                <li>Disable browser extensions temporarily</li>
+                <li>Contact your network administrator if on corporate network</li>
+              </ul>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Error Toast */}
       {errorMessage && (
         <motion.div
@@ -845,7 +1065,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
             </div>
             <div className="ml-3 flex-1">
               <p className="text-sm font-medium mb-2">{errorMessage}</p>
-              {lastCashfreeOrder && (
+              {lastCashfreeOrder && !showFallbackOptions && (
                 <div className="flex gap-2">
                   <button
                     onClick={retryPayment}
