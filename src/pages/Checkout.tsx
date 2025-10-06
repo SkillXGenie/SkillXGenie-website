@@ -393,37 +393,46 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       // Step 4: Clear cart before opening popup
       localStorage.removeItem('courseCart');
 
-      // Step 5: Open Cashfree payment popup
+      // Step 5: Open Cashfree payment popup or redirect
       const sessionId = cashfreeOrder.payment_session_id || cashfreeOrder.order_token;
-      console.log('🎯 Opening Cashfree payment popup with session ID:', sessionId);
+      console.log('🎯 Opening Cashfree payment with session ID:', sessionId);
 
       if (!sessionId) {
         throw new Error('No payment session ID received from backend');
       }
 
-      if (!cashfreeSDK) {
-        throw new Error('Cashfree SDK not ready. Please refresh and try again.');
-      }
-
-      // Open payment popup using the SDK
-      cashfreeSDK.checkout({
-        paymentSessionId: sessionId,
-        returnUrl: `${window.location.origin}/payment-success?order_id=${cashfreeOrder.order_id}`,
-        onSuccess: (data: any) => {
-          console.log('✅ Payment Success:', data);
-          setProcessing(false);
-          window.location.href = `${window.location.origin}/payment-success?order_id=${cashfreeOrder.order_id}&status=success`;
-        },
-        onFailure: (data: any) => {
-          console.log('❌ Payment Failed:', data);
-          alert(`Payment failed. Please try again.`);
-          setProcessing(false);
-        },
-        onClose: () => {
-          console.log('🔒 Payment popup closed by user');
-          setProcessing(false);
+      // Try popup mode first, fallback to redirect mode
+      if (cashfreeSDK && typeof cashfreeSDK.checkout === 'function') {
+        console.log('💳 Using popup mode');
+        try {
+          cashfreeSDK.checkout({
+            paymentSessionId: sessionId,
+            returnUrl: `${window.location.origin}/payment-success?order_id=${cashfreeOrder.order_id}`,
+            onSuccess: (data: any) => {
+              console.log('✅ Payment Success:', data);
+              setProcessing(false);
+              window.location.href = `${window.location.origin}/payment-success?order_id=${cashfreeOrder.order_id}&status=success`;
+            },
+            onFailure: (data: any) => {
+              console.log('❌ Payment Failed:', data);
+              alert(`Payment failed. Please try again.`);
+              setProcessing(false);
+            },
+            onClose: () => {
+              console.log('🔒 Payment popup closed by user');
+              setProcessing(false);
+            }
+          });
+        } catch (popupError) {
+          console.warn('⚠️ Popup mode failed, redirecting to payment page:', popupError);
+          // Fallback to redirect mode
+          window.location.href = `https://payments.cashfree.com/order/#${sessionId}`;
         }
-      });
+      } else {
+        console.log('🔄 SDK not available, using redirect mode');
+        // Direct redirect to Cashfree payment page
+        window.location.href = `https://payments.cashfree.com/order/#${sessionId}`;
+      }
 
     } catch (error) {
       console.error('❌ Payment error:', error);

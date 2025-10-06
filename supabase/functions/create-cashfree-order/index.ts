@@ -88,6 +88,7 @@ Deno.serve(async (req: Request) => {
     };
 
     console.log('📤 [Cashfree] Sending order payload to Cashfree API...');
+    console.log('📋 [Cashfree] Full payload:', JSON.stringify(orderPayload, null, 2));
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
@@ -112,7 +113,7 @@ Deno.serve(async (req: Request) => {
     console.log('📨 [Cashfree] API response status:', response.status);
 
     const responseText = await response.text();
-    console.log('📄 [Cashfree] Raw API response:', responseText.substring(0, 500) + '...');
+    console.log('📄 [Cashfree] Raw API response:', responseText);
 
     let cashfreeResponse;
     try {
@@ -123,8 +124,9 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!response.ok) {
-      const errorMsg = `❌ [Cashfree] API error (${response.status}): ${cashfreeResponse.message || JSON.stringify(cashfreeResponse)}`;
-      console.error(errorMsg);
+      const errorMsg = `Cashfree API error (${response.status}): ${cashfreeResponse.message || JSON.stringify(cashfreeResponse)}`;
+      console.error('❌ [Cashfree] ' + errorMsg);
+      console.error('📋 [Cashfree] Full error response:', JSON.stringify(cashfreeResponse, null, 2));
       throw new Error(errorMsg);
     }
 
