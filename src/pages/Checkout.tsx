@@ -85,62 +85,90 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
    */
   const loadCashfreeScript = () => {
     console.log('🔄 Loading Cashfree SDK script...');
+    setSdkLoading(true);
 
     // Check if script already exists
-    if (document.querySelector('script[src*="cashfree.com"]')) {
-      console.log('✅ Cashfree script already loaded');
-      initializeCashfreeSDK();
+    const existingScript = document.querySelector('script[src*="cashfree.com"]');
+    if (existingScript) {
+      console.log('✅ Cashfree script already in DOM, waiting for initialization...');
+      waitForCashfreeAndInitialize();
       return;
     }
 
     // Create and append script tag
     const script = document.createElement('script');
     script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
-    script.async = true;
-    script.defer = true;
+    script.type = 'text/javascript';
 
     script.onload = () => {
       console.log('✅ Cashfree script loaded successfully');
-      initializeCashfreeSDK();
+      waitForCashfreeAndInitialize();
     };
 
-    script.onerror = () => {
-      console.error('❌ Failed to load Cashfree script');
+    script.onerror = (error) => {
+      console.error('❌ Failed to load Cashfree script:', error);
       setSdkLoading(false);
-      alert('Failed to load payment system. Please check your internet connection and refresh the page.');
     };
 
     document.head.appendChild(script);
   };
 
   /**
+   * Wait for Cashfree object to be available and then initialize
+   * Uses polling to ensure SDK is fully loaded
+   */
+  const waitForCashfreeAndInitialize = () => {
+    let attempts = 0;
+    const maxAttempts = 20;
+    const interval = 200;
+
+    const checkCashfree = setInterval(() => {
+      attempts++;
+      console.log(`🔍 Checking for Cashfree SDK... (Attempt ${attempts}/${maxAttempts})`);
+
+      if (window.Cashfree && typeof window.Cashfree.load === 'function') {
+        console.log('✅ Cashfree SDK is available on window');
+        clearInterval(checkCashfree);
+        initializeCashfreeSDK();
+      } else if (attempts >= maxAttempts) {
+        console.error('❌ Cashfree SDK not available after maximum attempts');
+        console.error('Window.Cashfree:', window.Cashfree);
+        clearInterval(checkCashfree);
+        setSdkLoading(false);
+      }
+    }, interval);
+  };
+
+  /**
    * Initialize Cashfree SDK in production mode
-   * This must be called after the script is loaded
+   * This must be called after the script is loaded and Cashfree is available
    */
   const initializeCashfreeSDK = async () => {
     try {
       console.log('🔄 Initializing Cashfree SDK in production mode...');
-      setSdkLoading(true);
 
-      // Wait a bit for the script to fully initialize
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Check if Cashfree is available on window
-      if (!window.Cashfree) {
-        console.error('❌ Cashfree SDK not found on window object');
-        alert('Payment system not available. Please refresh the page.');
-        setSdkLoading(false);
-        return;
+      if (!window.Cashfree || typeof window.Cashfree.load !== 'function') {
+        throw new Error('Cashfree SDK not properly loaded. window.Cashfree.load is not a function.');
       }
 
-      // Load SDK in production mode
       const sdk = await window.Cashfree.load({ mode: "production" });
+
+      if (!sdk) {
+        throw new Error('Cashfree SDK initialization returned null or undefined');
+      }
+
       setCashfreeSDK(sdk);
-      console.log('✅ Cashfree SDK loaded successfully in production mode');
+      console.log('✅ Cashfree SDK initialized successfully in production mode');
+      console.log('SDK methods available:', Object.keys(sdk));
 
     } catch (error) {
       console.error('❌ Failed to initialize Cashfree SDK:', error);
-      alert('Failed to load payment system. Please refresh the page and try again.');
+      console.error('Error details:', {
+        message: error.message,
+        windowCashfree: window.Cashfree,
+        cashfreeType: typeof window.Cashfree,
+        hasLoad: window.Cashfree ? typeof window.Cashfree.load : 'N/A'
+      });
     } finally {
       setSdkLoading(false);
     }

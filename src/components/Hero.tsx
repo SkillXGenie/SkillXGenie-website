@@ -248,11 +248,18 @@ const Hero = () => {
             className="mt-20 text-center"
           >
             <h2 className="text-2xl font-semibold text-gray-900 mb-8">Trusted by Leading Educational Institutions</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center opacity-70">
-              <img src="https://via.placeholder.com/200x80?text=Partner+1" alt="Partner 1" />
-              <img src="https://via.placeholder.com/200x80?text=Partner+2" alt="Partner 2" />
-              <img src="https://via.placeholder.com/200x80?text=Partner+3" alt="Partner 3" />
-              <img src="https://via.placeholder.com/200x80?text=Partner+4" alt="Partner 4" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center">
+              {[1, 2, 3, 4].map((index) => (
+                <div
+                  key={index}
+                  className="h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-400 mb-1">🎓</div>
+                    <div className="text-xs font-semibold text-gray-500">Partner {index}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </motion.div>
         </div>
