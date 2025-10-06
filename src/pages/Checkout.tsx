@@ -136,7 +136,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
   /**
    * Initialize Cashfree SDK v3 in production mode
-   * Uses Promise-based loading without polling
+   * In v3, Cashfree is a namespace object, not a constructor
    */
   const initializeCashfreeSDK = async () => {
     setSdkLoading(true);
@@ -151,53 +151,15 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         throw new Error('Cashfree SDK not loaded');
       }
 
-      console.log('✅ Cashfree loaded, type:', typeof CashfreeLib);
-      console.log('Cashfree properties:', CashfreeLib);
+      console.log('✅ Cashfree loaded successfully');
+      console.log('📋 Cashfree type:', typeof CashfreeLib);
+      console.log('📋 Available methods:', Object.keys(CashfreeLib));
 
-      // Try different initialization patterns based on SDK version
-      let cashfreeInstance;
-
-      // Pattern 1: Check if it's a constructor function (new Cashfree())
-      if (typeof CashfreeLib === 'function') {
-        try {
-          console.log('🔄 Attempting to instantiate with new Cashfree({mode: "production"})...');
-          cashfreeInstance = new CashfreeLib({ mode: "production" });
-          console.log('✅ Successfully instantiated with constructor');
-        } catch (e) {
-          console.log('⚠️ Constructor pattern failed, trying direct usage');
-          // If constructor fails, use the function directly
-          cashfreeInstance = CashfreeLib;
-        }
-      }
-      // Pattern 2: It might be an object with methods already
-      else if (typeof CashfreeLib === 'object') {
-        console.log('✅ Cashfree is an object, using directly');
-        cashfreeInstance = CashfreeLib;
-      }
-      // Pattern 3: Fallback - just use it
-      else {
-        console.log('⚠️ Unknown Cashfree type, using as-is');
-        cashfreeInstance = CashfreeLib;
-      }
-
-      // Verify the instance has a checkout method
-      if (!cashfreeInstance || typeof cashfreeInstance.checkout !== 'function') {
-        console.error('⚠️ checkout method not found, available methods:',
-          cashfreeInstance ? Object.keys(cashfreeInstance) : 'none');
-
-        // For v3, the checkout method might be on the constructor itself
-        if (typeof CashfreeLib.checkout === 'function') {
-          console.log('✅ Found checkout on constructor, using that');
-          cashfreeInstance = CashfreeLib;
-        } else {
-          throw new Error('Cashfree SDK loaded but checkout method not found');
-        }
-      }
-
-      setCashfreeSDK(cashfreeInstance);
+      // In SDK v3, Cashfree is a namespace with methods like checkout()
+      // We use it directly without instantiation
+      setCashfreeSDK(CashfreeLib);
       setSdkLoading(false);
-      console.log('✅ Cashfree SDK initialized successfully');
-      console.log('Available methods:', cashfreeInstance ? Object.getOwnPropertyNames(cashfreeInstance) : 'none');
+      console.log('✅ Cashfree SDK v3 ready for use');
 
     } catch (error: any) {
       console.error('❌ Failed to initialize Cashfree SDK:', error);
@@ -438,31 +400,58 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
       // Step 4: Clear cart before opening popup
       localStorage.removeItem('courseCart');
 
-      // Step 5: Open Cashfree payment popup
-      console.log('🎯 Opening Cashfree payment popup with session ID:', cashfreeOrder.payment_session_id || cashfreeOrder.order_token);
-      
-      // Small delay to ensure everything is ready
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Open payment popup using the SDK
-      cashfreeSDK.checkout({
-        paymentSessionId: cashfreeOrder.payment_session_id || cashfreeOrder.order_token,
-        returnUrl: `${window.location.origin}/payment-success`,
-        onSuccess: (data: any) => {
-          console.log('✅ Payment Success:', data);
+      // Step 5: Open Cashfree payment popup using SDK v3
+      const sessionId = cashfreeOrder.payment_session_id || cashfreeOrder.order_token;
+      console.log('🎯 Opening Cashfree payment popup...');
+      console.log('📋 Payment session ID:', sessionId);
+      console.log('📋 Order ID:', cashfreeOrder.order_id);
+      console.log('📋 SDK ready:', !!cashfreeSDK);
+      console.log('📋 SDK checkout method:', typeof cashfreeSDK?.checkout);
+
+      if (!sessionId) {
+        throw new Error('No payment session ID received from backend');
+      }
+
+      if (!cashfreeSDK || typeof cashfreeSDK.checkout !== 'function') {
+        console.error('❌ Cashfree SDK not properly initialized');
+        console.error('SDK state:', { sdk: cashfreeSDK, methods: cashfreeSDK ? Object.keys(cashfreeSDK) : [] });
+        throw new Error('Cashfree SDK not ready. Please refresh and try again.');
+      }
+
+      // Build checkout options for SDK v3
+      const checkoutOptions = {
+        paymentSessionId: sessionId,
+        returnUrl: `${window.location.origin}/payment-success?order_id=${cashfreeOrder.order_id}`,
+        onSuccess: function(data: any) {
+          console.log('✅ Payment Success callback:', data);
           setProcessing(false);
           window.location.href = `${window.location.origin}/payment-success?order_id=${cashfreeOrder.order_id}&status=success`;
         },
-        onFailure: (data: any) => {
-          console.log('❌ Payment Failed:', data);
-          alert('Payment failed. Please try again.');
+        onFailure: function(data: any) {
+          console.log('❌ Payment Failed callback:', data);
+          alert(`Payment failed: ${data.error?.message || 'Unknown error'}. Please try again.`);
           setProcessing(false);
         },
-        onClose: () => {
+        onClose: function() {
           console.log('🔒 Payment popup closed by user');
           setProcessing(false);
         }
+      };
+
+      console.log('📤 Calling cashfreeSDK.checkout() with options:', {
+        hasSessionId: !!checkoutOptions.paymentSessionId,
+        returnUrl: checkoutOptions.returnUrl,
+        hasCallbacks: !!checkoutOptions.onSuccess
       });
+
+      // Call the checkout method
+      try {
+        const result = await cashfreeSDK.checkout(checkoutOptions);
+        console.log('✅ Checkout initiated:', result);
+      } catch (checkoutError: any) {
+        console.error('❌ Checkout method error:', checkoutError);
+        throw new Error(`Failed to open payment popup: ${checkoutError.message || 'Unknown error'}`);
+      }
 
     } catch (error) {
       console.error('❌ Payment error:', error);
