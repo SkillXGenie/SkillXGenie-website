@@ -240,6 +240,28 @@ const Hero = () => {
               </motion.div>
             </motion.div>
           </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.5 }}
+            className="mt-20 text-center"
+          >
+            <h2 className="text-2xl font-semibold text-gray-900 mb-8">Trusted by Leading Educational Institutions</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center">
+              {[1, 2, 3, 4].map((index) => (
+                <div
+                  key={index}
+                  className="h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-lg flex items-center justify-center shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-400 mb-1">🎓</div>
+                    <div className="text-xs font-semibold text-gray-500">Partner {index}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
         </div>
       </div>
 

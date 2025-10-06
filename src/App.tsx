@@ -14,18 +14,6 @@ import Dashboard from './pages/Dashboard';
 import Checkout from './pages/Checkout';
 import PaymentSuccess from './pages/PaymentSuccess';
 
-// Resource Pages
-import Blog from './pages/resources/Blog';
-import StudentSuccess from './pages/resources/StudentSuccess';
-import CareerGuide from './pages/resources/CareerGuide';
-import HelpCenter from './pages/resources/HelpCenter';
-
-// Legal Pages
-import PrivacyPolicy from './pages/legal/PrivacyPolicy';
-import TermsOfService from './pages/legal/TermsOfService';
-import CookiePolicy from './pages/legal/CookiePolicy';
-import Accessibility from './pages/legal/Accessibility';
-
 function App() {
   const [showNewsletter, setShowNewsletter] = useState(false);
 
@@ -53,18 +41,6 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/payment-success" element={<PaymentSuccess />} />
-            
-            {/* Resource Routes */}
-            <Route path="/blog" element={<Blog />} />
-            <Route path="/student-success" element={<StudentSuccess />} />
-            <Route path="/career-guide" element={<CareerGuide />} />
-            <Route path="/help-center" element={<HelpCenter />} />
-            
-            {/* Legal Routes */}
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-            <Route path="/terms-of-service" element={<TermsOfService />} />
-            <Route path="/cookie-policy" element={<CookiePolicy />} />
-            <Route path="/accessibility" element={<Accessibility />} />
           </Routes>
         </main>
         <Footer />
