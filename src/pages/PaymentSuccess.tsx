@@ -93,7 +93,7 @@ const PaymentSuccess = () => {
 
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Payment Successful!</h1>
           <p className="text-xl text-gray-600 mb-8">
-            Thank you for your purchase. Your courses are now available in your dashboard.
+            Thank you for your enrollment! You will be contacted soon by our team.
           </p>
 
           {orderDetails && (
@@ -151,28 +151,28 @@ const PaymentSuccess = () => {
                   1
                 </div>
                 <div>
-                  <h4 className="font-medium mb-2">Access Your Courses</h4>
-                  <p className="text-sm text-gray-600">Go to your dashboard to start learning immediately</p>
+                  <h4 className="font-medium mb-2">We'll Contact You Soon</h4>
+                  <p className="text-sm text-gray-600">Our team will reach out to you within 24 hours with course details</p>
                 </div>
               </div>
-              
+
               <div className="flex items-start">
                 <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold mr-3 mt-1">
                   2
                 </div>
                 <div>
-                  <h4 className="font-medium mb-2">Download Resources</h4>
-                  <p className="text-sm text-gray-600">Access downloadable materials and certificates</p>
+                  <h4 className="font-medium mb-2">Live Classes Will Start</h4>
+                  <p className="text-sm text-gray-600">You'll receive the schedule and joining links for live classes</p>
                 </div>
               </div>
-              
+
               <div className="flex items-start">
                 <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold mr-3 mt-1">
                   3
                 </div>
                 <div>
-                  <h4 className="font-medium mb-2">Join Community</h4>
-                  <p className="text-sm text-gray-600">Connect with other learners and mentors</p>
+                  <h4 className="font-medium mb-2">Course Materials</h4>
+                  <p className="text-sm text-gray-600">Access to learning materials and resources will be provided</p>
                 </div>
               </div>
             </div>
