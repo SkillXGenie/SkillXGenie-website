@@ -268,7 +268,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
    * Create fresh Cashfree order token
    * This is called on every payment attempt to ensure fresh token
    */
-  const createFreshOrderToken = async () => {
+  const createFreshOrderToken = async (orderNumber: string) => {
     try {
       console.log('🔄 Creating fresh Cashfree order token...');
 
@@ -284,6 +284,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
 
       // Prepare order data for backend
       const orderData = {
+        order_id: orderNumber, // Use our order number as Cashfree order_id
         order_amount: total,
         order_currency: 'INR',
         customer_details: {
@@ -524,8 +525,8 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
         savedOrder = await saveOrderToDatabase(orderData);
       }
 
-      // Step 2: Create fresh order token
-      const cashfreeOrder = await createFreshOrderToken();
+      // Step 2: Create fresh order token with our order number
+      const cashfreeOrder = await createFreshOrderToken(orderNumber);
 
       if (!cashfreeOrder) {
         // Demo mode already handled
@@ -547,10 +548,7 @@ const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () =
           .eq('id', savedOrder.id);
       }
 
-      // Step 4: Clear cart before opening payment
-      localStorage.removeItem('courseCart');
-
-      // Step 5: Open Cashfree payment - form-based redirect
+      // Step 4: Open Cashfree payment - DO NOT clear cart until payment is verified
       await openCashfreePayment(cashfreeOrder);
 
     } catch (error) {

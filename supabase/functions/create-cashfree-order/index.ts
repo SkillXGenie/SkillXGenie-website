@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 interface OrderRequest {
+  order_id?: string; // Optional order ID from frontend
   order_amount: number;
   order_currency: string;
   customer_details: {
@@ -32,7 +33,7 @@ Deno.serve(async (req: Request) => {
   try {
     console.log('🚀 [Cashfree] Received request to create fresh order token');
 
-    const { order_amount, order_currency, customer_details, order_meta }: OrderRequest = await req.json();
+    const { order_id: frontendOrderId, order_amount, order_currency, customer_details, order_meta }: OrderRequest = await req.json();
 
     console.log('📋 [Cashfree] Order request details:', {
       order_amount,
@@ -58,11 +59,10 @@ Deno.serve(async (req: Request) => {
       throw new Error(errorMsg);
     }
 
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substr(2, 9);
-    const order_id = `order_${timestamp}_${randomSuffix}`;
+    // Use frontend order_id if provided, otherwise generate one
+    const order_id = frontendOrderId || `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    console.log('🆔 [Cashfree] Generated unique order ID:', order_id);
+    console.log('🆔 [Cashfree] Order ID:', order_id, frontendOrderId ? '(from frontend)' : '(generated)');
 
     const cashfreeUrl = "https://api.cashfree.com/pg/orders";
     console.log('🌐 [Cashfree] Using production API URL:', cashfreeUrl);
