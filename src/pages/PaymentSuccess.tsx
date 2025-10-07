@@ -15,6 +15,60 @@ const PaymentSuccess = () => {
     verifyPayment();
   }, []);
 
+  const saveEnrollments = async (order: any) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No user found for enrollment');
+        return;
+      }
+
+      // Parse the items from the order
+      const items = order.items || [];
+
+      // Calculate expiry dates based on plan type
+      const enrollments = items.map((item: any) => {
+        const enrolledAt = new Date();
+        let expiresAt = null;
+
+        if (item.plan === 'short') {
+          // 30 days for short-term
+          expiresAt = new Date(enrolledAt);
+          expiresAt.setDate(expiresAt.getDate() + 30);
+        } else if (item.plan === 'long') {
+          // 120 days for long-term (4 months)
+          expiresAt = new Date(enrolledAt);
+          expiresAt.setDate(expiresAt.getDate() + 120);
+        }
+
+        return {
+          user_id: user.id,
+          course_id: item.courseId,
+          course_title: item.courseName,
+          plan_type: item.plan,
+          price_paid: parseInt(item.price.replace('₹', '').replace(',', '')) * 100,
+          order_id: order.id,
+          enrolled_at: enrolledAt.toISOString(),
+          expires_at: expiresAt ? expiresAt.toISOString() : null,
+          access_granted: true
+        };
+      });
+
+      // Insert enrollments into user_courses table
+      const { error: enrollError } = await supabase
+        .from('user_courses')
+        .insert(enrollments);
+
+      if (enrollError) {
+        console.error('Error saving enrollments:', enrollError);
+      } else {
+        console.log('Enrollments saved successfully');
+      }
+    } catch (error) {
+      console.error('Error in saveEnrollments:', error);
+    }
+  };
+
   const verifyPayment = async () => {
     try {
       // Get payment details from URL parameters
@@ -81,6 +135,10 @@ const PaymentSuccess = () => {
               console.error('Error updating order:', error);
             } else {
               setOrderDetails(order);
+
+              // Save course enrollments to user_courses table
+              await saveEnrollments(order);
+
               // Clear cart only on successful payment
               localStorage.removeItem('courseCart');
             }

@@ -1,9 +1,10 @@
-import React, { Fragment } from 'react';
+import React, { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, Mail } from 'lucide-react';
+import { supabase } from '../../lib/supabaseClient';
 
 const newsletterSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -17,15 +18,53 @@ interface NewsletterPopupProps {
 }
 
 const NewsletterPopup: React.FC<NewsletterPopupProps> = ({ isOpen, onClose }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { register, handleSubmit, formState: { errors }, reset } = useForm<NewsletterFormData>({
     resolver: zodResolver(newsletterSchema),
   });
 
-  const onSubmit = (data: NewsletterFormData) => {
-    console.log('Newsletter subscription:', data);
-    // Implement newsletter subscription logic here
-    reset();
-    onClose();
+  const onSubmit = async (data: NewsletterFormData) => {
+    setIsSubmitting(true);
+    try {
+      // Check if Supabase is configured
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        console.log('Newsletter subscription (demo mode):', data);
+        alert('Thank you for subscribing!');
+        reset();
+        onClose();
+        return;
+      }
+
+      // Save to database
+      const { error } = await supabase
+        .from('newsletter_subscribers')
+        .insert([
+          {
+            email: data.email,
+            subscribed_at: new Date().toISOString(),
+            is_active: true
+          }
+        ]);
+
+      if (error) {
+        // Check if email already exists
+        if (error.code === '23505') {
+          alert('This email is already subscribed to our newsletter!');
+        } else {
+          console.error('Error subscribing:', error);
+          alert('Failed to subscribe. Please try again.');
+        }
+      } else {
+        alert('Thank you for subscribing to our newsletter!');
+        reset();
+        onClose();
+      }
+    } catch (error) {
+      console.error('Error subscribing:', error);
+      alert('Failed to subscribe. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -93,9 +132,10 @@ const NewsletterPopup: React.FC<NewsletterPopupProps> = ({ isOpen, onClose }) =>
                   </div>
                   <button
                     type="submit"
-                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                    disabled={isSubmitting}
+                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Subscribe Now
+                    {isSubmitting ? 'Subscribing...' : 'Subscribe Now'}
                   </button>
                   <p className="text-xs text-gray-500 text-center">
                     By subscribing, you agree to our Privacy Policy and consent to receive updates from our company.

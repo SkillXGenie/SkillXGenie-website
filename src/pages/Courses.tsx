@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Briefcase, MessageCircle, Bot, Code, Coffee, FileCode, Clock, IndianRupee, ShoppingCart, Users, Star } from 'lucide-react';
+import { supabase } from '../lib/supabaseClient';
 
 interface Course {
   id: string;
@@ -165,16 +166,49 @@ const Courses = () => {
   const [hoveredCourse, setHoveredCourse] = useState<string | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
+  const [enrollmentCounts, setEnrollmentCounts] = useState<{[key: string]: number}>({});
 
   useEffect(() => {
     const updateWindowSize = () => {
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
     };
-    
+
     updateWindowSize();
     window.addEventListener('resize', updateWindowSize);
     return () => window.removeEventListener('resize', updateWindowSize);
   }, []);
+
+  useEffect(() => {
+    fetchEnrollmentCounts();
+  }, []);
+
+  const fetchEnrollmentCounts = async () => {
+    try {
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        return;
+      }
+
+      // Get enrollment counts for each course
+      const { data, error } = await supabase
+        .from('user_courses')
+        .select('course_id');
+
+      if (error) {
+        console.error('Error fetching enrollment counts:', error);
+        return;
+      }
+
+      // Count enrollments per course
+      const counts: {[key: string]: number} = {};
+      data?.forEach((enrollment: any) => {
+        counts[enrollment.course_id] = (counts[enrollment.course_id] || 0) + 1;
+      });
+
+      setEnrollmentCounts(counts);
+    } catch (error) {
+      console.error('Error fetching enrollment counts:', error);
+    }
+  };
 
   const filteredCourses = selectedCategory === "All" 
     ? courses 
@@ -282,7 +316,7 @@ const Courses = () => {
                     </div>
                     <div className="flex items-center text-gray-500">
                       <Users className="h-4 w-4" />
-                      <span className="text-sm ml-1">{course.students}</span>
+                      <span className="text-sm ml-1">{enrollmentCounts[course.id] || 0}</span>
                     </div>
                   </div>
                 </div>
@@ -371,7 +405,7 @@ const Courses = () => {
                       </div>
                       <div className="flex items-center">
                         <Users className="h-4 w-4 text-gray-500 mr-1" />
-                        <span>{course.students} students</span>
+                        <span>{enrollmentCounts[course.id] || 0} students</span>
                       </div>
                       <div className="flex items-center">
                         <Clock className="h-4 w-4 text-gray-500 mr-1" />

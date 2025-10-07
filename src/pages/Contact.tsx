@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-
 import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, Clock } from 'lucide-react';
 import Select, { MultiValue } from 'react-select';
+import { supabase } from '../lib/supabaseClient';
 
 const contactInfo = [
   {
@@ -41,6 +41,69 @@ const courseOptions = [
 
 const Contact = () => {
   const [selectedCourses, setSelectedCourses] = useState<{ value: string; label: string }[]>([]);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    subject: '',
+    message: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      // Check if Supabase is configured
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        console.log('Contact form submission (demo mode):', formData);
+        alert('Thank you for your message! We will get back to you soon.');
+        setFormData({ name: '', email: '', subject: '', message: '' });
+        setSelectedCourses([]);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Get current user if logged in
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Prepare submission data
+      const submissionData = {
+        name: formData.name,
+        email: formData.email,
+        subject: formData.subject + (selectedCourses.length > 0 ? ` | Interested in: ${selectedCourses.map(c => c.label).join(', ')}` : ''),
+        message: formData.message,
+        user_id: user?.id || null,
+        submitted_at: new Date().toISOString()
+      };
+
+      // Save to database
+      const { error } = await supabase
+        .from('contact_submissions')
+        .insert([submissionData]);
+
+      if (error) {
+        console.error('Error submitting contact form:', error);
+        alert('Failed to submit your message. Please try again or contact us directly.');
+      } else {
+        alert('Thank you for your message! We will get back to you soon.');
+        setFormData({ name: '', email: '', subject: '', message: '' });
+        setSelectedCourses([]);
+      }
+    } catch (error) {
+      console.error('Error submitting contact form:', error);
+      alert('Failed to submit your message. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   return (
     <div className="pt-16 min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
@@ -62,13 +125,17 @@ const Contact = () => {
           >
             <div className="bg-white p-8 rounded-xl shadow-lg">
               <h2 className="text-2xl font-bold mb-6">Send us a message</h2>
-              <form className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Your Name
                   </label>
                   <input
                     type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="John Doe"
                   />
@@ -79,6 +146,10 @@ const Contact = () => {
                   </label>
                   <input
                     type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="john@example.com"
                   />
@@ -89,6 +160,10 @@ const Contact = () => {
                   </label>
                   <input
                     type="text"
+                    name="subject"
+                    value={formData.subject}
+                    onChange={handleInputChange}
+                    required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="How can we help?"
                   />
@@ -111,15 +186,20 @@ const Contact = () => {
                   </label>
                   <textarea
                     rows={4}
+                    name="message"
+                    value={formData.message}
+                    onChange={handleInputChange}
+                    required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Your message here..."
                   />
                 </div>
                 <button
                   type="submit"
-                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                  disabled={isSubmitting}
+                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Send Message
+                  {isSubmitting ? 'Sending...' : 'Send Message'}
                 </button>
               </form>
             </div>

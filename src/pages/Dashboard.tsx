@@ -29,9 +29,38 @@ const Dashboard = () => {
 
   useEffect(() => {
     getProfile();
+    getEnrolledCourses();
     // getBadges();
     // checkFirstLogin();
   }, []);
+
+  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
+
+  const getEnrolledCourses = async () => {
+    try {
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('user_courses')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('enrolled_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching enrolled courses:', error);
+        return;
+      }
+
+      setEnrolledCourses(data || []);
+    } catch (error) {
+      console.error('Error fetching enrolled courses:', error);
+    }
+  };
 
   // const checkFirstLogin = async () => {
   //   const { data: { user } } = await supabase.auth.getUser();
@@ -69,17 +98,35 @@ const Dashboard = () => {
         navigate('/');
         return;
       }
-      
+
       if (user) {
-        // Create a basic profile from user data
-        const basicProfile = {
-          id: user.id,
-          name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
-          phone: '',
-          avatar_url: '',
-          bio: ''
-        };
-        setProfile(basicProfile);
+        // Fetch profile from database
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
+        }
+
+        if (profileData) {
+          setProfile(profileData);
+          if (profileData.avatar_url) {
+            setAvatarUrl(profileData.avatar_url);
+          }
+        } else {
+          // Profile doesn't exist yet, create a basic one
+          const basicProfile = {
+            id: user.id,
+            name: user.user_metadata?.name || user.email?.split('@')[0] || 'User',
+            phone: '',
+            avatar_url: '',
+            bio: ''
+          };
+          setProfile(basicProfile);
+        }
       } else {
         navigate('/');
       }
@@ -122,15 +169,90 @@ const Dashboard = () => {
   // };
 
   const updateProfile = async (updates: Partial<Profile>) => {
-    // For now, just update local state
-    setProfile((prev) => ({ ...prev!, ...updates }));
-    setIsEditing(false);
-    alert('Profile updated successfully! (Note: Changes are not persisted yet)');
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: updates.name,
+          phone: updates.phone,
+          bio: updates.bio,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', profile!.id);
+
+      if (error) {
+        console.error('Error updating profile:', error);
+        alert('Failed to update profile: ' + error.message);
+        return;
+      }
+
+      setProfile((prev) => ({ ...prev!, ...updates }));
+      setIsEditing(false);
+      alert('Profile updated successfully!');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Failed to update profile. Please try again.');
+    }
   };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    // Simplified avatar upload - just show a message for now
-    alert('Avatar upload feature will be available soon!');
+    const file = event.target.files?.[0];
+    if (!file || !profile) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${profile.id}/${Date.now()}.${fileExt}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error('Error uploading avatar:', uploadError);
+        alert('Failed to upload avatar: ' + uploadError.message);
+        return;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      // Update profile with new avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', profile.id);
+
+      if (updateError) {
+        console.error('Error updating profile avatar:', updateError);
+        alert('Failed to update profile: ' + updateError.message);
+        return;
+      }
+
+      setAvatarUrl(publicUrl);
+      setProfile({ ...profile, avatar_url: publicUrl });
+      alert('Avatar updated successfully!');
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      alert('Failed to upload avatar. Please try again.');
+    }
   };
 
   const handleLogout = async () => {
@@ -143,7 +265,7 @@ const Dashboard = () => {
   };
 
   const stats = [
-    { icon: BookOpen, label: 'Courses Enrolled', value: '3' },
+    { icon: BookOpen, label: 'Courses Enrolled', value: enrolledCourses.length.toString() },
     { icon: Star, label: 'Average Rating', value: '4.8' },
     { icon: Trophy, label: 'Badges Earned', value: badges.length.toString() }
   ];
@@ -272,6 +394,38 @@ const Dashboard = () => {
                       </div>
                     ) : (
                       <p className="text-gray-500 text-center">No badges earned yet. Complete courses to earn badges!</p>
+                    )}
+                  </div>
+
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-semibold mb-4">My Enrolled Courses</h3>
+                    {enrolledCourses.length > 0 ? (
+                      <div className="space-y-3">
+                        {enrolledCourses.map((course) => (
+                          <div key={course.id} className="bg-white p-4 rounded-lg border border-gray-200">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <h4 className="font-medium text-gray-900">{course.course_title}</h4>
+                                <p className="text-sm text-gray-600 mt-1">
+                                  {course.plan_type === 'short' ? 'Short-Term (30 Days)' : 'Long-Term (3-4 Months)'}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Enrolled: {new Date(course.enrolled_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div className="flex items-center">
+                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                  course.access_granted ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {course.access_granted ? 'Active' : 'Pending'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-center py-4">No courses enrolled yet. Browse our courses to get started!</p>
                     )}
                   </div>
 
