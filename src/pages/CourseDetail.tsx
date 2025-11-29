@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabaseClient';
 import AuthModal from '../components/auth/AuthModal';
+import { courses } from '../data/coursesData';
 import { 
   Star, 
   Users, 

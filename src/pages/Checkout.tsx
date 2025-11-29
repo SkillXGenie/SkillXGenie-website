@@ -39,15 +39,13 @@ interface CashfreeInstance {
   checkout: (options: any) => Promise<any>;
 }
 
-const courses: Course[] = [
-  { id: "business-essentials", title: "Business Essentials", emoji: "💼" },
-  { id: "spoken-english", title: "Spoken English Mastery", emoji: "🗣️" },
-  { id: "robotics-fundamentals", title: "Robotics Fundamentals", emoji: "🤖" },
-  { id: "c-programming", title: "C Programming", emoji: "💻" },
-  { id: "cpp-programming", title: "C++ Programming", emoji: "💡" },
-  { id: "java-programming", title: "Java Programming", emoji: "☕" },
-  { id: "python-programming", title: "Python Programming", emoji: "🐍" }
-];
+import { courses as allCourses } from '../data/coursesData';
+
+const courses = allCourses.map(course => ({
+  id: course.id,
+  title: course.title,
+  emoji: course.emoji
+}));
 
 const CheckoutForm: React.FC<{ cartItems: CartItem[], user: any, onSuccess: () => void }> = ({ 
   cartItems, 
